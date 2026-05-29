@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  margin: 0;
+  background: #faf5ea;
+  font-family: 'Zen Maru Gothic', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 横スクロールタブのスクロールバーを隠す */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
