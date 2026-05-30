@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle } from 'lucide-react';
-import type { AppState, Item } from '../types';
+import type { AppState, Item, RecurringItem, RecurrenceType } from '../types';
 import type { SyncStatus } from '../hooks/useAppState';
 import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEM_EMOJI_CHOICES } from '../constants';
 import { shareUrlFor } from '../lib/storage';
+import { jstDateOffset } from '../lib/date';
+import { ruleLabel } from '../lib/recurring';
 
 interface Props {
   state: AppState;
@@ -26,6 +28,8 @@ interface Props {
     resetAll: (date: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
+    addRecurringItem: (childId: string, rule: Omit<RecurringItem, 'id'>) => boolean;
+    removeRecurringItem: (childId: string, ruleId: string) => void;
     enableSharing: () => void;
     joinFamily: (input: string) => Promise<boolean>;
     disableSharing: () => void;
@@ -51,6 +55,59 @@ export default function SettingsModal({
   const [joinInput, setJoinInput] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
+
+  // 定期的な持ち物フォーム用 state
+  const [recChildId, setRecChildId] = useState(state.currentChildId);
+  const [showAddRecurring, setShowAddRecurring] = useState(false);
+  const [recItemKey, setRecItemKey] = useState('');
+  const [recQty, setRecQty] = useState(1);
+  const [recType, setRecType] = useState<RecurrenceType>('weekly');
+  const [recInterval, setRecInterval] = useState(1);
+  const [recWeekdays, setRecWeekdays] = useState<number[]>([]);
+  const [recMonthlyKind, setRecMonthlyKind] = useState<'dayOfMonth' | 'nthWeekday'>('dayOfMonth');
+  const [recMonthlyDay, setRecMonthlyDay] = useState(1);
+  const [recMonthlyNth, setRecMonthlyNth] = useState(1);
+  const [recMonthlyWeekday, setRecMonthlyWeekday] = useState(1);
+
+  const recChild = state.children.find((c) => c.id === recChildId) ?? state.children[0];
+
+  const resetRecurringForm = () => {
+    setRecItemKey('');
+    setRecQty(1);
+    setRecType('weekly');
+    setRecInterval(1);
+    setRecWeekdays([]);
+    setRecMonthlyKind('dayOfMonth');
+    setRecMonthlyDay(1);
+    setRecMonthlyNth(1);
+    setRecMonthlyWeekday(1);
+  };
+
+  const handleAddRecurring = () => {
+    const rule: Omit<RecurringItem, 'id'> =
+      recType === 'weekly'
+        ? {
+            itemKey: recItemKey,
+            qty: recQty,
+            type: 'weekly',
+            weekdays: recWeekdays,
+            interval: recInterval,
+            ...(recInterval > 1 ? { anchorDate: jstDateOffset(0) } : {}),
+          }
+        : {
+            itemKey: recItemKey,
+            qty: recQty,
+            type: 'monthly',
+            monthlyPattern:
+              recMonthlyKind === 'dayOfMonth'
+                ? { kind: 'dayOfMonth', day: recMonthlyDay }
+                : { kind: 'nthWeekday', nth: recMonthlyNth, weekday: recMonthlyWeekday },
+          };
+    if (actions.addRecurringItem(recChildId, rule)) {
+      setShowAddRecurring(false);
+      resetRecurringForm();
+    }
+  };
 
   const addItem = () => {
     if (actions.addCustomItem(newItemName, newItemEmoji)) {
@@ -281,6 +338,321 @@ export default function SettingsModal({
                 );
               })}
             </div>
+          </section>
+
+          {/* 定期的な持ち物 */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-1">定期的な持ち物</h3>
+            <div className="text-xs text-stone-500 mb-2 leading-relaxed">
+              毎週・隔週・毎月など、決まった日に持っていく物を登録します。
+            </div>
+
+            {/* 子ども切り替えタブ */}
+            {state.children.length > 1 && (
+              <div className="flex gap-1.5 mb-2 overflow-x-auto -mx-1 px-1 pb-1 no-scrollbar">
+                {state.children.map((c) => {
+                  const active = c.id === recChildId;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setRecChildId(c.id)}
+                      className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-bold transition-all active:scale-95 ${
+                        active
+                          ? 'bg-stone-800 text-white'
+                          : 'bg-white text-stone-600 border border-stone-200'
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 登録済みルール一覧 */}
+            {(recChild.recurringItems ?? []).length > 0 && (
+              <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 mb-2">
+                {(recChild.recurringItems ?? []).map((rule) => (
+                  <div key={rule.id} className="flex items-center gap-2 px-3 py-2.5">
+                    <div className="flex-1 text-sm font-bold text-stone-700 leading-snug">
+                      {ruleLabel(rule, items)}
+                    </div>
+                    <button
+                      onClick={() => actions.removeRecurringItem(recChildId, rule.id)}
+                      className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center shrink-0"
+                      aria-label="削除"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 追加フォーム */}
+            {!showAddRecurring ? (
+              <button
+                onClick={() => setShowAddRecurring(true)}
+                className="w-full bg-white rounded-xl py-3 border-2 border-dashed border-stone-300 text-stone-600 font-bold active:scale-95 transition-all flex items-center justify-center gap-1"
+              >
+                <Plus size={15} /> 定期的な持ち物を追加
+              </button>
+            ) : (
+              <div className="bg-white rounded-xl border border-stone-200 p-3 space-y-3">
+                {/* 品目選択 */}
+                <div>
+                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">品目</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {items.map((item) => (
+                      <button
+                        key={item.key}
+                        onClick={() => setRecItemKey(item.key)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 ${
+                          recItemKey === item.key
+                            ? 'bg-stone-800 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        <span>{item.emoji}</span>
+                        <span>{item.key}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 個数 */}
+                <div>
+                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">個数</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setRecQty((v) => Math.max(1, v - 1))}
+                      disabled={recQty <= 1}
+                      className="w-9 h-9 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center active:scale-90 disabled:opacity-30"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <div className="w-8 text-center font-black text-lg text-stone-800">{recQty}</div>
+                    <button
+                      onClick={() => setRecQty((v) => v + 1)}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-white active:scale-90"
+                      style={{ background: ACCENT }}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 繰り返し種別 */}
+                <div>
+                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">繰り返し</div>
+                  <div className="flex gap-1.5">
+                    {(['weekly', 'monthly'] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setRecType(t)}
+                        className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all active:scale-95 ${
+                          recType === t
+                            ? 'bg-stone-800 text-white'
+                            : 'bg-stone-100 text-stone-500'
+                        }`}
+                      >
+                        {t === 'weekly' ? '週ごと' : '毎月'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 週ごと設定 */}
+                {recType === 'weekly' && (
+                  <>
+                    <div>
+                      <div className="text-[11px] font-bold text-stone-500 mb-1.5">N週ごと</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setRecInterval((v) => Math.max(1, v - 1))}
+                          disabled={recInterval <= 1}
+                          className="w-9 h-9 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center active:scale-90 disabled:opacity-30"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <div className="text-center font-black text-base text-stone-800 w-24">
+                          {recInterval === 1 ? '毎週' : recInterval === 2 ? '隔週' : `${recInterval}週ごと`}
+                        </div>
+                        <button
+                          onClick={() => setRecInterval((v) => Math.min(8, v + 1))}
+                          disabled={recInterval >= 8}
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-white active:scale-90 disabled:opacity-30"
+                          style={{ background: ACCENT }}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-bold text-stone-500 mb-1.5">曜日</div>
+                      <div className="flex gap-1">
+                        {(['日', '月', '火', '水', '木', '金', '土'] as const).map((label, wdNum) => {
+                          const isOn = recWeekdays.includes(wdNum);
+                          const isSun = wdNum === 0;
+                          const isSat = wdNum === 6;
+                          return (
+                            <button
+                              key={wdNum}
+                              onClick={() =>
+                                setRecWeekdays((prev) =>
+                                  isOn ? prev.filter((d) => d !== wdNum) : [...prev, wdNum].sort((a, b) => a - b)
+                                )
+                              }
+                              className={`flex-1 py-2 rounded-xl text-sm font-black transition-all active:scale-95 ${
+                                isOn
+                                  ? isSun
+                                    ? 'bg-red-500 text-white'
+                                    : isSat
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-stone-700 text-white'
+                                  : isSun
+                                  ? 'bg-red-50 text-red-400 border border-red-200'
+                                  : isSat
+                                  ? 'bg-blue-50 text-blue-400 border border-blue-200'
+                                  : 'bg-stone-100 text-stone-400'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* 毎月設定 */}
+                {recType === 'monthly' && (
+                  <>
+                    <div>
+                      <div className="text-[11px] font-bold text-stone-500 mb-1.5">種類</div>
+                      <div className="flex gap-1.5">
+                        {(['dayOfMonth', 'nthWeekday'] as const).map((k) => (
+                          <button
+                            key={k}
+                            onClick={() => setRecMonthlyKind(k)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                              recMonthlyKind === k
+                                ? 'bg-stone-800 text-white'
+                                : 'bg-stone-100 text-stone-500'
+                            }`}
+                          >
+                            {k === 'dayOfMonth' ? '毎月○日' : '第n曜日'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {recMonthlyKind === 'dayOfMonth' && (
+                      <div>
+                        <div className="text-[11px] font-bold text-stone-500 mb-1.5">日にち</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setRecMonthlyDay((v) => Math.max(1, v - 1))}
+                            disabled={recMonthlyDay <= 1}
+                            className="w-9 h-9 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center active:scale-90 disabled:opacity-30"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <div className="w-12 text-center font-black text-lg text-stone-800">
+                            {recMonthlyDay}日
+                          </div>
+                          <button
+                            onClick={() => setRecMonthlyDay((v) => Math.min(31, v + 1))}
+                            disabled={recMonthlyDay >= 31}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-white active:scale-90 disabled:opacity-30"
+                            style={{ background: ACCENT }}
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {recMonthlyKind === 'nthWeekday' && (
+                      <>
+                        <div>
+                          <div className="text-[11px] font-bold text-stone-500 mb-1.5">第何回目</div>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <button
+                                key={n}
+                                onClick={() => setRecMonthlyNth(n)}
+                                className={`flex-1 py-2 rounded-xl text-sm font-black transition-all active:scale-95 ${
+                                  recMonthlyNth === n
+                                    ? 'bg-stone-800 text-white'
+                                    : 'bg-stone-100 text-stone-500'
+                                }`}
+                              >
+                                第{n}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] font-bold text-stone-500 mb-1.5">曜日</div>
+                          <div className="flex gap-1">
+                            {(['日', '月', '火', '水', '木', '金', '土'] as const).map((label, wdNum) => {
+                              const isSun = wdNum === 0;
+                              const isSat = wdNum === 6;
+                              const isOn = recMonthlyWeekday === wdNum;
+                              return (
+                                <button
+                                  key={wdNum}
+                                  onClick={() => setRecMonthlyWeekday(wdNum)}
+                                  className={`flex-1 py-2 rounded-xl text-sm font-black transition-all active:scale-95 ${
+                                    isOn
+                                      ? isSun
+                                        ? 'bg-red-500 text-white'
+                                        : isSat
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-stone-700 text-white'
+                                      : isSun
+                                      ? 'bg-red-50 text-red-400 border border-red-200'
+                                      : isSat
+                                      ? 'bg-blue-50 text-blue-400 border border-blue-200'
+                                      : 'bg-stone-100 text-stone-400'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* アクションボタン */}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowAddRecurring(false);
+                      resetRecurringForm();
+                    }}
+                    className="flex-1 py-2.5 rounded-xl border border-stone-200 text-stone-500 font-bold text-sm active:scale-95"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleAddRecurring}
+                    disabled={
+                      !recItemKey ||
+                      (recType === 'weekly' && recWeekdays.length === 0)
+                    }
+                    className="flex-1 py-2.5 rounded-xl text-white font-bold text-sm active:scale-95 disabled:opacity-40"
+                    style={{ background: ACCENT }}
+                  >
+                    追加する
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* 地域(表示用) */}
