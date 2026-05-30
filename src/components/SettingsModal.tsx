@@ -27,6 +27,7 @@ interface Props {
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
     enableSharing: () => void;
+    joinFamily: (input: string) => Promise<boolean>;
     disableSharing: () => void;
     syncNow: () => void;
   };
@@ -47,6 +48,8 @@ export default function SettingsModal({
   const [copied, setCopied] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemEmoji, setNewItemEmoji] = useState(ITEM_EMOJI_CHOICES[0]);
+  const [joinInput, setJoinInput] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
 
   const addItem = () => {
@@ -426,6 +429,35 @@ export default function SettingsModal({
                 >
                   <Users size={16} /> 家族と共有を開始
                 </button>
+                <div className="bg-white rounded-xl p-4 border border-stone-200 space-y-2">
+                  <p className="text-xs font-bold text-stone-700">招待コードで参加</p>
+                  <p className="text-xs text-stone-500 leading-relaxed">
+                    家族から送られたリンクまたはIDを貼り付けてください。
+                    ホーム画面アプリではリンクをタップしても開けないため、こちらから参加できます。
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={joinInput}
+                      onChange={(e) => setJoinInput(e.target.value)}
+                      placeholder="https://... または 招待ID"
+                      className="flex-1 min-w-0 bg-stone-50 rounded-xl px-3 py-2.5 border border-stone-200 text-xs text-stone-700 focus:outline-none focus:ring-1 focus:ring-stone-400"
+                    />
+                    <button
+                      disabled={joinLoading || !joinInput.trim()}
+                      onClick={async () => {
+                        setJoinLoading(true);
+                        const ok = await actions.joinFamily(joinInput);
+                        setJoinLoading(false);
+                        if (ok) setJoinInput('');
+                      }}
+                      className="shrink-0 px-3 rounded-xl text-white font-bold text-sm active:scale-95 disabled:opacity-50 transition-all"
+                      style={{ background: ACCENT }}
+                    >
+                      {joinLoading ? '…' : '参加'}
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
