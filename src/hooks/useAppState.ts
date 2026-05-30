@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppState, Child, Item } from '../types';
-import { DEFAULT_THRESHOLD, ITEMS } from '../constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from '../constants';
 import {
   createProvider,
   getStoredFamilyId,
@@ -13,7 +13,7 @@ import {
 } from '../lib/storage';
 
 import type { Forecast, DayBag } from '../types';
-import { uid, jstDateOffset } from '../lib/date';
+import { uid, jstDateOffset, jstWeekdayNum, nextDaycareDay } from '../lib/date';
 import { fetchForecast } from '../lib/weather';
 
 export type SyncStatus = 'local' | 'ok' | 'error';
@@ -26,6 +26,7 @@ function initialState(): AppState {
     location: { name: '東京都' },
     thresholdTemp: DEFAULT_THRESHOLD,
     customItems: [],
+    closedWeekdays: DEFAULT_CLOSED_WEEKDAYS,
     updatedAt: 0,
   };
 }
@@ -80,6 +81,9 @@ export function useAppState() {
       setFamilyId(fid);
       setState(next);
       setLoading(false);
+      // 次の登園日をデフォルト選択
+      const closed = next.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
+      setSelectedDate(nextDaycareDay(closed));
     })();
     return () => {
       active = false;
@@ -361,6 +365,25 @@ export function useAppState() {
     [save]
   );
 
+  const setClosedWeekdays = useCallback(
+    (closedWeekdays: number[]) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = { ...s, closedWeekdays };
+        save(next);
+        return next;
+      });
+      // 現在の選択日が休みになった場合は次の登園日へ移動
+      setSelectedDate((prev) => {
+        if (closedWeekdays.includes(jstWeekdayNum(prev))) {
+          return nextDaycareDay(closedWeekdays);
+        }
+        return prev;
+      });
+    },
+    [save]
+  );
+
   /** 天気を取得(同期せずローカル state にのみ反映) */
   const fetchWeather = useCallback(async (name?: string) => {
     const loc = name ?? stateRef.current?.location?.name;
@@ -516,6 +539,7 @@ export function useAppState() {
       toggleConfirm,
       setLocation,
       setThreshold,
+      setClosedWeekdays,
       fetchWeather,
       addCustomItem,
       removeCustomItem,

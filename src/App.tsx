@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
-import { DEFAULT_THRESHOLD, ITEMS } from './constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
@@ -84,6 +84,7 @@ export default function App() {
           selectedDate={selectedDate}
           forecast={forecast}
           threshold={threshold}
+          closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           onSelectDate={setSelectedDate}
         />
 

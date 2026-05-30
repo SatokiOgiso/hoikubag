@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle } from 'lucide-react';
 import type { AppState, Item } from '../types';
 import type { SyncStatus } from '../hooks/useAppState';
-import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, ITEM_EMOJI_CHOICES } from '../constants';
+import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEM_EMOJI_CHOICES } from '../constants';
 import { shareUrlFor } from '../lib/storage';
 
 interface Props {
@@ -22,6 +22,7 @@ interface Props {
     saveCurrentAsDefault: (date: string) => void;
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
+    setClosedWeekdays: (days: number[]) => void;
     resetAll: (date: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
@@ -323,6 +324,48 @@ export default function SettingsModal({
                   {name}
                 </button>
               ))}
+            </div>
+          </section>
+
+          {/* 保育園のない日 */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-1">保育園のない日</h3>
+            <div className="text-xs text-stone-500 mb-2 leading-relaxed">
+              選択した曜日は「休」と表示され、次の登園日に自動でジャンプします。
+            </div>
+            <div className="flex gap-1.5">
+              {(['日', '月', '火', '水', '木', '金', '土'] as const).map((label, wdNum) => {
+                const closed = state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
+                const isOn = closed.includes(wdNum);
+                const isSun = wdNum === 0;
+                const isSat = wdNum === 6;
+                return (
+                  <button
+                    key={wdNum}
+                    onClick={() => {
+                      const next = isOn
+                        ? closed.filter((d) => d !== wdNum)
+                        : [...closed, wdNum].sort((a, b) => a - b);
+                      actions.setClosedWeekdays(next);
+                    }}
+                    className={`flex-1 py-2 rounded-xl text-sm font-black transition-all active:scale-95 ${
+                      isOn
+                        ? isSun
+                          ? 'bg-red-500 text-white'
+                          : isSat
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-stone-700 text-white'
+                        : isSun
+                        ? 'bg-red-50 text-red-400 border border-red-200'
+                        : isSat
+                        ? 'bg-blue-50 text-blue-400 border border-blue-200'
+                        : 'bg-white text-stone-400 border border-stone-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </section>
 

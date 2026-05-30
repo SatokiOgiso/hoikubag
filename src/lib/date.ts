@@ -24,6 +24,20 @@ export function jstWeekday(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00+09:00`));
 }
 
+/** JST の曜日番号を返す。0=日..6=土 */
+export function jstWeekdayNum(isoDate: string): number {
+  return new Date(isoDate + 'T00:00:00Z').getUTCDay();
+}
+
+/** 保育園のある直近の登園日(startOffset 以降)を返す。closedWeekdays: 0=日..6=土 */
+export function nextDaycareDay(closedWeekdays: number[], startOffset = 1): string {
+  for (let off = startOffset; off < startOffset + 7; off++) {
+    const d = jstDateOffset(off);
+    if (!closedWeekdays.includes(jstWeekdayNum(d))) return d;
+  }
+  return jstDateOffset(startOffset); // 全曜日が休みのフォールバック
+}
+
 /** 「5月31日(日)」のような日付ラベル(JST基準)。相対語(昨日/今日/明日)も前置 */
 export function dateLabel(isoDate: string): string {
   const [, mm, dd] = isoDate.split('-');

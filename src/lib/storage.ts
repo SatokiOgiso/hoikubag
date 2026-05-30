@@ -49,6 +49,7 @@ export function migrate(raw: unknown): AppState | null {
     location: data.location?.name ? data.location : { name: '東京都' },
     thresholdTemp: data.thresholdTemp ?? 23,
     customItems: Array.isArray(data.customItems) ? data.customItems : [],
+    closedWeekdays: Array.isArray(data.closedWeekdays) ? data.closedWeekdays : [0, 6],
     updatedAt: data.updatedAt || 0,
   };
 }

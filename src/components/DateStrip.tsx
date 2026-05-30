@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react';
 import type { Forecast } from '../types';
-import { jstDateOffset, jstWeekday } from '../lib/date';
+import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
 import { iconFromLabel } from '../lib/icons';
 
 interface Props {
   selectedDate: string;
   forecast: Forecast | null;
   threshold: number;
+  closedWeekdays: number[];
   onSelectDate: (date: string) => void;
 }
 
@@ -44,8 +45,15 @@ function tempColor(t: number | null): string {
   return '#A8A29E';
 }
 
+function weekdayColor(wdNum: number, active: boolean): string {
+  if (active) return 'text-white/80';
+  if (wdNum === 0) return 'text-red-500'; // 日
+  if (wdNum === 6) return 'text-blue-500'; // 土
+  return 'text-stone-500';
+}
+
 /** 日付ストリップ(最上部・横スクロール・日付選択) */
-export default function DateStrip({ selectedDate, forecast, onSelectDate }: Props) {
+export default function DateStrip({ selectedDate, forecast, closedWeekdays, onSelectDate }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
@@ -70,6 +78,8 @@ export default function DateStrip({ selectedDate, forecast, onSelectDate }: Prop
           const active = date === selectedDate;
           const day = byDate.get(date) ?? null;
           const Icon = day ? iconFromLabel(day.label) : null;
+          const wdNum = jstWeekdayNum(date);
+          const isClosed = closedWeekdays.includes(wdNum);
           return (
             <button
               key={date}
@@ -81,7 +91,7 @@ export default function DateStrip({ selectedDate, forecast, onSelectDate }: Prop
                   : 'bg-white text-stone-600 border border-stone-200'
               }`}
             >
-              <span className={`text-[11px] font-bold ${active ? 'text-white' : 'text-stone-500'}`}>
+              <span className={`text-[11px] font-bold ${weekdayColor(wdNum, active)}`}>
                 {rel || jstWeekday(date)}
               </span>
               <span className="text-base font-black leading-none">
@@ -114,8 +124,16 @@ export default function DateStrip({ selectedDate, forecast, onSelectDate }: Prop
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>
-              {/* 予報精度バッジ (A/B/C) */}
-              {day?.reliability ? (
+              {/* 下段バッジ: 休日 > 予報精度 > 空スペース */}
+              {isClosed ? (
+                <span
+                  className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${
+                    active ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-400'
+                  }`}
+                >
+                  休
+                </span>
+              ) : day?.reliability ? (
                 <span
                   className={`text-[10px] font-black leading-none px-1 py-0.5 rounded-md ${
                     active
