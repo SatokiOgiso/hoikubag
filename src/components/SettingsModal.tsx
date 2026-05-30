@@ -7,6 +7,7 @@ import { shareUrlFor } from '../lib/storage';
 import { jstDateOffset } from '../lib/date';
 import { ruleLabel } from '../lib/recurring';
 import ConfirmDialog, { type ConfirmOptions } from './ConfirmDialog';
+import NotificationSection from './NotificationSection';
 
 interface Props {
   state: AppState;
@@ -17,6 +18,7 @@ interface Props {
   selectedDate: string;
   fontScale: number;
   onFontScale: (v: number) => void;
+  showToast: (msg: string) => void;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -49,6 +51,7 @@ export default function SettingsModal({
   selectedDate,
   fontScale,
   onFontScale,
+  showToast,
   onClose,
   actions,
 }: Props) {
@@ -835,6 +838,9 @@ export default function SettingsModal({
               </div>
             </div>
           </section>
+
+          {/* 準備リマインド通知 */}
+          <NotificationSection familyId={familyId} showToast={showToast} />
 
           {/* 家族との同期 */}
           <section>

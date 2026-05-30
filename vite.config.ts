@@ -45,6 +45,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         // 天気API・同期APIはキャッシュせず常にネットワークへ
         navigateFallbackDenylist: [/^\/api\//],
+        // Web Push のハンドラを生成SWに合流させる
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // Google Fonts のスタイルシート
