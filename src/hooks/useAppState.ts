@@ -263,18 +263,14 @@ export function useAppState() {
   /** 指定日のかばんの内容をデフォルトとして保存 */
   const saveCurrentAsDefault = useCallback(
     (date: string) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        prev = s;
-        const next = mapCurrentChild(s, (c) => ({
-          ...c,
-          defaults: { ...(c.bags?.[date]?.items ?? {}) },
-        }));
-        save(next);
-        return next;
-      });
-      if (prev) showToast('現在の入力をデフォルトに保存しました', makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      const next = mapCurrentChild(prev, (c) => ({
+        ...c,
+        defaults: { ...(c.bags?.[date]?.items ?? {}) },
+      }));
+      save(next);
+      showToast('現在の入力をデフォルトに保存しました', makeUndo(prev));
     },
     [mapCurrentChild, save, showToast, makeUndo]
   );
@@ -311,26 +307,21 @@ export function useAppState() {
 
   const removeChild = useCallback(
     (id: string) => {
-      let prev: AppState | null = null;
-      let removedName = '';
-      setState((s) => {
-        if (!s) return s;
-        if (s.children.length <= 1) {
-          showToast('最低1人は必要です');
-          return s;
-        }
-        prev = s;
-        removedName = s.children.find((c) => c.id === id)?.name ?? '';
-        const remaining = s.children.filter((c) => c.id !== id);
-        const next = {
-          ...s,
-          children: remaining,
-          currentChildId: s.currentChildId === id ? remaining[0].id : s.currentChildId,
-        };
-        save(next);
-        return next;
-      });
-      if (prev) showToast(`「${removedName}」を削除しました`, makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      if (prev.children.length <= 1) {
+        showToast('最低1人は必要です');
+        return;
+      }
+      const removedName = prev.children.find((c) => c.id === id)?.name ?? '';
+      const remaining = prev.children.filter((c) => c.id !== id);
+      const next = {
+        ...prev,
+        children: remaining,
+        currentChildId: prev.currentChildId === id ? remaining[0].id : prev.currentChildId,
+      };
+      save(next);
+      showToast(`「${removedName}」を削除しました`, makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
@@ -347,22 +338,18 @@ export function useAppState() {
   /** 指定日の指定子どものかばんをデフォルトに戻す */
   const resetChild = useCallback(
     (date: string, id: string) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        prev = s;
-        const next = {
-          ...s,
-          children: s.children.map((c) =>
-            c.id === id
-              ? { ...c, bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } } }
-              : c
-          ),
-        };
-        save(next);
-        return next;
-      });
-      if (prev) showToast('デフォルトに戻しました', makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      const next = {
+        ...prev,
+        children: prev.children.map((c) =>
+          c.id === id
+            ? { ...c, bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } } }
+            : c
+        ),
+      };
+      save(next);
+      showToast('デフォルトに戻しました', makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
@@ -370,21 +357,17 @@ export function useAppState() {
   /** 指定日の全員のかばんをデフォルトに戻す */
   const resetAll = useCallback(
     (date: string) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        prev = s;
-        const next = {
-          ...s,
-          children: s.children.map((c) => ({
-            ...c,
-            bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
-          })),
-        };
-        save(next);
-        return next;
-      });
-      if (prev) showToast('全員デフォルトに戻しました', makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      const next = {
+        ...prev,
+        children: prev.children.map((c) => ({
+          ...c,
+          bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
+        })),
+      };
+      save(next);
+      showToast('全員デフォルトに戻しました', makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
@@ -427,32 +410,28 @@ export function useAppState() {
 
   const copyBag = useCallback(
     (childId: string, fromDate: string, toDates: string[]) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        const child = s.children.find((c) => c.id === childId);
-        if (!child) return s;
-        prev = s;
-        const fromItems = child.bags?.[fromDate]?.items ?? {};
-        const next: AppState = {
-          ...s,
-          children: s.children.map((c) => {
-            if (c.id !== childId) return c;
-            const bags = { ...c.bags };
-            for (const d of toDates) {
-              bags[d] = { items: { ...fromItems }, confirmed: false };
-            }
-            return { ...c, bags };
-          }),
-        };
-        save(next);
-        return next;
-      });
+      const prev = stateRef.current;
+      if (!prev) return;
+      const child = prev.children.find((c) => c.id === childId);
+      if (!child) return;
+      const fromItems = child.bags?.[fromDate]?.items ?? {};
+      const next: AppState = {
+        ...prev,
+        children: prev.children.map((c) => {
+          if (c.id !== childId) return c;
+          const bags = { ...c.bags };
+          for (const d of toDates) {
+            bags[d] = { items: { ...fromItems }, confirmed: false };
+          }
+          return { ...c, bags };
+        }),
+      };
+      save(next);
       const label =
         toDates.length === 1
           ? toDates[0].slice(5).replace('-', '/') + 'にコピーしました'
           : `${toDates.length}日にコピーしました`;
-      if (prev) showToast(label, makeUndo(prev));
+      showToast(label, makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
@@ -533,32 +512,28 @@ export function useAppState() {
   /** 追加した品目を削除(全員の items / defaults からも取り除く) */
   const removeCustomItem = useCallback(
     (key: string) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        prev = s;
-        const strip = (rec: Record<string, number>) => {
-          if (!(key in rec)) return rec;
-          const copy = { ...rec };
-          delete copy[key];
-          return copy;
-        };
-        const next: AppState = {
-          ...s,
-          customItems: s.customItems.filter((i) => i.key !== key),
-          children: s.children.map((c) => {
-            // すべての日付のかばんから取り除く
-            const bags: Record<string, DayBag> = {};
-            for (const [d, bag] of Object.entries(c.bags || {})) {
-              bags[d] = { items: strip(bag.items), confirmed: bag.confirmed };
-            }
-            return { ...c, bags, defaults: strip(c.defaults) };
-          }),
-        };
-        save(next);
-        return next;
-      });
-      if (prev) showToast(`「${key}」を削除しました`, makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      const strip = (rec: Record<string, number>) => {
+        if (!(key in rec)) return rec;
+        const copy = { ...rec };
+        delete copy[key];
+        return copy;
+      };
+      const next: AppState = {
+        ...prev,
+        customItems: prev.customItems.filter((i) => i.key !== key),
+        children: prev.children.map((c) => {
+          // すべての日付のかばんから取り除く
+          const bags: Record<string, DayBag> = {};
+          for (const [d, bag] of Object.entries(c.bags || {})) {
+            bags[d] = { items: strip(bag.items), confirmed: bag.confirmed };
+          }
+          return { ...c, bags, defaults: strip(c.defaults) };
+        }),
+      };
+      save(next);
+      showToast(`「${key}」を削除しました`, makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
@@ -617,22 +592,18 @@ export function useAppState() {
 
   const removeRecurringItem = useCallback(
     (childId: string, ruleId: string) => {
-      let prev: AppState | null = null;
-      setState((s) => {
-        if (!s) return s;
-        prev = s;
-        const next: AppState = {
-          ...s,
-          children: s.children.map((c) =>
-            c.id === childId
-              ? { ...c, recurringItems: (c.recurringItems ?? []).filter((r) => r.id !== ruleId) }
-              : c
-          ),
-        };
-        save(next);
-        return next;
-      });
-      if (prev) showToast('定期的な持ち物を削除しました', makeUndo(prev));
+      const prev = stateRef.current;
+      if (!prev) return;
+      const next: AppState = {
+        ...prev,
+        children: prev.children.map((c) =>
+          c.id === childId
+            ? { ...c, recurringItems: (c.recurringItems ?? []).filter((r) => r.id !== ruleId) }
+            : c
+        ),
+      };
+      save(next);
+      showToast('定期的な持ち物を削除しました', makeUndo(prev));
     },
     [save, showToast, makeUndo]
   );
