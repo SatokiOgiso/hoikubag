@@ -28,7 +28,6 @@ interface Props {
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
     setClosedWeekdays: (days: number[]) => void;
-    resetAll: (date: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
     addRecurringItem: (childId: string, rule: Omit<RecurringItem, 'id'>) => boolean;
@@ -835,29 +834,6 @@ export default function SettingsModal({
                 </div>
               </div>
             </div>
-          </section>
-
-          {/* 全リセット */}
-          <section>
-            <button
-              onClick={() =>
-                askConfirm(
-                  {
-                    title: '全員分をリセットしますか?',
-                    message: `${selectedDate.slice(5).replace('-', '/')}の全員の準備リストがデフォルトに戻ります。`,
-                    confirmLabel: 'リセットする',
-                    destructive: true,
-                  },
-                  () => {
-                    actions.resetAll(selectedDate);
-                    onClose();
-                  }
-                )
-              }
-              className="w-full bg-white rounded-xl py-3 border border-stone-200 text-stone-700 font-bold hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
-            >
-              全員分の準備リストをリセット
-            </button>
           </section>
 
           {/* 家族との同期 */}

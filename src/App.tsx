@@ -20,6 +20,7 @@ export default function App() {
     weatherLoading,
     selectedDate,
     setSelectedDate,
+    showToast,
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
@@ -148,11 +149,14 @@ export default function App() {
           isHot={isHot}
           isCool={isCool}
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
+          childCount={state.children.length}
           onChangeItem={actions.changeItem}
           onReset={actions.resetChild}
+          onResetAll={actions.resetAll}
           onToggleConfirm={actions.toggleConfirm}
           onCopyBag={actions.copyBag}
           onChangeNotes={actions.changeNotes}
+          showToast={showToast}
         />
       </div>
 
