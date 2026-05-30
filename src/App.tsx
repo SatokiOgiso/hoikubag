@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings, RefreshCw } from 'lucide-react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
@@ -22,6 +22,19 @@ export default function App() {
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
+  const [fontScale, setFontScaleState] = useState<number>(() => {
+    const s = localStorage.getItem('fontScale');
+    return s ? parseFloat(s) : 1.0;
+  });
+  const setFontScale = (v: number) => {
+    const next = Math.round(Math.min(1.5, Math.max(0.7, v)) * 10) / 10;
+    setFontScaleState(next);
+    localStorage.setItem('fontScale', String(next));
+  };
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${fontScale * 16}px`;
+    return () => { document.documentElement.style.fontSize = ''; };
+  }, [fontScale]);
 
   if (loading || !state) {
     return (
@@ -146,6 +159,8 @@ export default function App() {
           syncStatus={syncStatus}
           syncError={syncError}
           selectedDate={selectedDate}
+          fontScale={fontScale}
+          onFontScale={setFontScale}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />
