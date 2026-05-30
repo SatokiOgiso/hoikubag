@@ -1,14 +1,15 @@
-import type { AppState } from '../types';
-import { ITEMS, ACCENT } from '../constants';
+import type { AppState, Item } from '../types';
+import { ACCENT } from '../constants';
 import { tomorrowLabel } from '../lib/date';
 
 interface Props {
   state: AppState;
+  items: Item[];
   onSelectChild: (id: string) => void;
 }
 
 /** 明日のかばん(最上部・全員分サマリー) */
-export default function BagSummary({ state, onSelectChild }: Props) {
+export default function BagSummary({ state, items, onSelectChild }: Props) {
   return (
     <div className="px-5 mb-4">
       <div className="rounded-2xl bg-stone-800 text-white p-4 shadow-sm">
@@ -52,7 +53,7 @@ export default function BagSummary({ state, onSelectChild }: Props) {
                 </div>
                 {cTotal > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {ITEMS.filter((i) => cItems[i.key]).map((i) => (
+                    {items.filter((i) => cItems[i.key]).map((i) => (
                       <div
                         key={i.key}
                         className="bg-white/10 px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1"

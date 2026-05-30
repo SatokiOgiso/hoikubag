@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users } from 'lucide-react';
-import type { AppState } from '../types';
-import { ITEMS, COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD } from '../constants';
+import type { AppState, Item } from '../types';
+import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, ITEM_EMOJI_CHOICES } from '../constants';
 import { shareUrlFor } from '../lib/storage';
 
 interface Props {
   state: AppState;
+  items: Item[];
   familyId: string | null;
   onClose: () => void;
   actions: {
@@ -18,6 +19,8 @@ interface Props {
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
     resetAll: () => void;
+    addCustomItem: (name: string, emoji: string) => boolean;
+    removeCustomItem: (key: string) => void;
     enableSharing: () => void;
     disableSharing: () => void;
     syncNow: () => void;
@@ -25,10 +28,19 @@ interface Props {
 }
 
 /** 設定モーダル(下から立ち上がる/デスクトップは中央) */
-export default function SettingsModal({ state, familyId, onClose, actions }: Props) {
+export default function SettingsModal({ state, items, familyId, onClose, actions }: Props) {
   const [citySearch, setCitySearch] = useState('');
   const [copied, setCopied] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemEmoji, setNewItemEmoji] = useState(ITEM_EMOJI_CHOICES[0]);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
+
+  const addItem = () => {
+    if (actions.addCustomItem(newItemName, newItemEmoji)) {
+      setNewItemName('');
+      setNewItemEmoji(ITEM_EMOJI_CHOICES[0]);
+    }
+  };
 
   const shareUrl = familyId ? shareUrlFor(familyId) : '';
   const copyShareUrl = async () => {
@@ -102,6 +114,75 @@ export default function SettingsModal({ state, familyId, onClose, actions }: Pro
             </div>
           </section>
 
+          {/* 持ち物の種類(追加・削除) */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-2">持ち物の種類</h3>
+            <div className="text-xs text-stone-500 mb-2 leading-relaxed">
+              リストにない持ち物(バスタオルなど)を追加できます。全員のリストに表示されます。
+            </div>
+
+            {/* 追加した品目の一覧(削除可) */}
+            {state.customItems.length > 0 && (
+              <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 mb-2">
+                {state.customItems.map((item) => (
+                  <div key={item.key} className="flex items-center gap-2 px-3 py-2">
+                    <div className="text-xl w-7 text-center">{item.emoji}</div>
+                    <div className="flex-1 text-sm font-bold text-stone-700">{item.key}</div>
+                    <button
+                      onClick={() => actions.removeCustomItem(item.key)}
+                      className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center"
+                      aria-label={`${item.key}を削除`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 新規追加フォーム */}
+            <div className="bg-white rounded-xl border border-stone-200 p-3 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addItem();
+                  }}
+                  placeholder="例: バスタオル"
+                  className="flex-1 min-w-0 bg-stone-50 rounded-lg px-3 py-2 border border-stone-200 text-sm text-stone-800 focus:outline-none focus:border-stone-400"
+                />
+                <button
+                  onClick={addItem}
+                  disabled={!newItemName.trim()}
+                  className={`shrink-0 px-3 rounded-lg text-white font-bold text-sm active:scale-95 flex items-center gap-1 ${
+                    newItemName.trim() ? '' : 'bg-stone-300'
+                  }`}
+                  style={newItemName.trim() ? { background: ACCENT } : {}}
+                >
+                  <Plus size={15} /> 追加
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {ITEM_EMOJI_CHOICES.map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => setNewItemEmoji(e)}
+                    className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center active:scale-90 transition-all ${
+                      newItemEmoji === e
+                        ? 'bg-stone-800 ring-2 ring-stone-800'
+                        : 'bg-stone-100'
+                    }`}
+                    aria-label={`絵文字 ${e}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
           {/* デフォルトの持ち物 */}
           <section>
             <div className="flex items-baseline justify-between mb-1">
@@ -148,7 +229,7 @@ export default function SettingsModal({ state, familyId, onClose, actions }: Pro
 
             {/* 品目編集リスト */}
             <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100">
-              {ITEMS.map((item) => {
+              {items.map((item) => {
                 const dCount = (currentChild?.defaults || {})[item.key] || 0;
                 return (
                   <div key={item.key} className="flex items-center gap-2 px-3 py-2">

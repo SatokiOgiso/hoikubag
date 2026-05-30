@@ -23,6 +23,12 @@ export const COMMON_LOCATIONS = [
   '兵庫県', '愛知県', '福岡県', '北海道', '宮城県', '広島県', '沖縄県',
 ];
 
+// 追加品目の絵文字候補(設定画面で選択)
+export const ITEM_EMOJI_CHOICES = [
+  '🧺', '🛁', '🧴', '🪥', '🧢', '👟', '🧤', '🧣', '🍱', '🥤',
+  '💊', '🩹', '📒', '🖍️', '🎀', '🧷', '🦟', '☂️', '📦', '⭐',
+];
+
 export const STORAGE_KEY = 'hoiku-prep-v1';
 export const DEFAULT_THRESHOLD = 23; // 袖の警告基準温度(°C)
 export const ACCENT = '#D86B4A'; // メインカラー

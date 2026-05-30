@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppState, Child } from '../types';
-import { DEFAULT_THRESHOLD } from '../constants';
+import type { AppState, Child, Item } from '../types';
+import { DEFAULT_THRESHOLD, ITEMS } from '../constants';
 import {
   createProvider,
   getStoredFamilyId,
@@ -19,6 +19,7 @@ function initialState(): AppState {
     location: { name: '東京都' },
     weather: null,
     thresholdTemp: DEFAULT_THRESHOLD,
+    customItems: [],
     updatedAt: 0,
   };
 }
@@ -291,6 +292,63 @@ export function useAppState() {
     });
   }, [save]);
 
+  // ---- 品目のカスタマイズ ----
+
+  /** リストにない品目(バスタオルなど)を追加。成功すれば true */
+  const addCustomItem = useCallback(
+    (name: string, emoji: string): boolean => {
+      const key = name.trim();
+      if (!key) {
+        showToast('品目名を入力してください');
+        return false;
+      }
+      const exists =
+        ITEMS.some((i) => i.key === key) ||
+        (state?.customItems || []).some((i) => i.key === key);
+      if (exists) {
+        showToast('同じ名前の品目があります');
+        return false;
+      }
+      setState((s) => {
+        if (!s) return s;
+        const item: Item = { key, emoji: emoji || '📦' };
+        const next = { ...s, customItems: [...s.customItems, item] };
+        save(next);
+        return next;
+      });
+      showToast(`「${key}」を追加しました`);
+      return true;
+    },
+    [state?.customItems, save, showToast]
+  );
+
+  /** 追加した品目を削除(全員の items / defaults からも取り除く) */
+  const removeCustomItem = useCallback(
+    (key: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const strip = (rec: Record<string, number>) => {
+          if (!(key in rec)) return rec;
+          const copy = { ...rec };
+          delete copy[key];
+          return copy;
+        };
+        const next: AppState = {
+          ...s,
+          customItems: s.customItems.filter((i) => i.key !== key),
+          children: s.children.map((c) => ({
+            ...c,
+            items: strip(c.items),
+            defaults: strip(c.defaults),
+          })),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   // ---- 家族共有 ----
 
   /** 共有を開始: 新しい familyId を発行し、現在のデータをクラウドへアップロード */
@@ -347,6 +405,8 @@ export function useAppState() {
       setThreshold,
       setManualWeather,
       clearWeather,
+      addCustomItem,
+      removeCustomItem,
       enableSharing,
       disableSharing,
       syncNow,

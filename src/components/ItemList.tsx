@@ -1,17 +1,18 @@
 import { Plus, Minus, RefreshCw, AlertTriangle } from 'lucide-react';
-import type { Child } from '../types';
-import { ITEMS, ACCENT } from '../constants';
+import type { Child, Item } from '../types';
+import { ACCENT } from '../constants';
 
 interface Props {
   child: Child;
+  items: Item[];
   isHot: boolean;
   isCool: boolean;
   onChangeItem: (key: string, delta: number) => void;
   onReset: (id: string) => void;
 }
 
-/** 持ち物リスト(13品目・+/-ボタン・袖警告) */
-export default function ItemList({ child, isHot, isCool, onChangeItem, onReset }: Props) {
+/** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告) */
+export default function ItemList({ child, items: itemDefs, isHot, isCool, onChangeItem, onReset }: Props) {
   const items = child.items || {};
   const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
 
@@ -32,7 +33,7 @@ export default function ItemList({ child, isHot, isCool, onChangeItem, onReset }
       </div>
 
       <div className="space-y-2">
-        {ITEMS.map((item) => {
+        {itemDefs.map((item) => {
           const count = items[item.key] || 0;
           const warn =
             (item.sleeve === 'long' && isHot && count > 0) ||

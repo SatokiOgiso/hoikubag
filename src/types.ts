@@ -28,6 +28,7 @@ export interface AppState {
   location: Location;
   weather: Weather | null;
   thresholdTemp: number; // デフォルト 23
+  customItems: Item[]; // ユーザーが追加した品目(バスタオルなど)
   updatedAt: number; // 競合解決用タイムスタンプ
 }
 

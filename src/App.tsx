@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
-import { DEFAULT_THRESHOLD } from './constants';
+import { DEFAULT_THRESHOLD, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import BagSummary from './components/BagSummary';
 import WeatherCard from './components/WeatherCard';
@@ -28,6 +28,9 @@ export default function App() {
   const hasTemp = tempHigh != null;
   const isHot = hasTemp && tempHigh > threshold;
   const isCool = hasTemp && tempHigh <= threshold;
+
+  // 標準品目 + ユーザー追加品目
+  const allItems = [...ITEMS, ...state.customItems];
 
   return (
     <div className="min-h-screen pb-16">
@@ -60,7 +63,7 @@ export default function App() {
           </div>
         </header>
 
-        <BagSummary state={state} onSelectChild={actions.selectChild} />
+        <BagSummary state={state} items={allItems} onSelectChild={actions.selectChild} />
 
         <WeatherCard
           state={state}
@@ -76,6 +79,7 @@ export default function App() {
 
         <ItemList
           child={currentChild}
+          items={allItems}
           isHot={isHot}
           isCool={isCool}
           onChangeItem={actions.changeItem}
@@ -86,6 +90,7 @@ export default function App() {
       {showSettings && (
         <SettingsModal
           state={state}
+          items={allItems}
           familyId={familyId}
           onClose={() => setShowSettings(false)}
           actions={actions}
