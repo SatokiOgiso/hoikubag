@@ -5,6 +5,7 @@ export interface Child {
   name: string; // 例: "太郎"
   items: Record<string, number>; // 翌日の入力。例: { "おむつ": 3 }
   defaults: Record<string, number>; // リセット時の初期値。例: { "おむつ": 3, "肌着": 1 }
+  confirmed?: boolean; // 翌日の準備を確定したか
 }
 
 export interface Location {

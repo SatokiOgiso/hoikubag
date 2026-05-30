@@ -1,4 +1,4 @@
-import { Plus, Minus, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { ACCENT } from '../constants';
 
@@ -9,12 +9,22 @@ interface Props {
   isCool: boolean;
   onChangeItem: (key: string, delta: number) => void;
   onReset: (id: string) => void;
+  onToggleConfirm: () => void;
 }
 
 /** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告) */
-export default function ItemList({ child, items: itemDefs, isHot, isCool, onChangeItem, onReset }: Props) {
+export default function ItemList({
+  child,
+  items: itemDefs,
+  isHot,
+  isCool,
+  onChangeItem,
+  onReset,
+  onToggleConfirm,
+}: Props) {
   const items = child.items || {};
   const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
+  const confirmed = !!child.confirmed;
 
   return (
     <div className="px-5">
@@ -104,6 +114,20 @@ export default function ItemList({ child, items: itemDefs, isHot, isCool, onChan
           );
         })}
       </div>
+
+      {/* 確定ボタン(確定/取り消しをトグル) */}
+      <button
+        onClick={onToggleConfirm}
+        className={`w-full mt-4 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all ${
+          confirmed
+            ? 'bg-white border-2 border-emerald-500 text-emerald-600'
+            : 'text-white shadow-sm'
+        }`}
+        style={confirmed ? {} : { background: '#10B981' }}
+      >
+        <Check size={22} strokeWidth={3} />
+        {confirmed ? `${child.name}の確定を取り消す` : `${child.name}の準備を確定する`}
+      </button>
     </div>
   );
 }

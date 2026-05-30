@@ -102,6 +102,7 @@ export default function App() {
           isCool={isCool}
           onChangeItem={actions.changeItem}
           onReset={actions.resetChild}
+          onToggleConfirm={actions.toggleConfirm}
         />
       </div>
 

@@ -155,7 +155,8 @@ export function useAppState() {
           const v = Math.max(0, (items[key] || 0) + delta);
           if (v === 0) delete items[key];
           else items[key] = v;
-          return { ...c, items };
+          // 確定後に内容を変えたら確定を解除する
+          return { ...c, items, confirmed: false };
         });
         save(next);
         return next;
@@ -163,6 +164,16 @@ export function useAppState() {
     },
     [mapCurrentChild, save]
   );
+
+  /** 現在の子どもの確定状態をトグル */
+  const toggleConfirm = useCallback(() => {
+    setState((s) => {
+      if (!s) return s;
+      const next = mapCurrentChild(s, (c) => ({ ...c, confirmed: !c.confirmed }));
+      save(next);
+      return next;
+    });
+  }, [mapCurrentChild, save]);
 
   const changeDefault = useCallback(
     (key: string, delta: number) => {
@@ -262,7 +273,7 @@ export function useAppState() {
         const next = {
           ...s,
           children: s.children.map((c) =>
-            c.id === id ? { ...c, items: { ...c.defaults } } : c
+            c.id === id ? { ...c, items: { ...c.defaults }, confirmed: false } : c
           ),
         };
         save(next);
@@ -278,7 +289,7 @@ export function useAppState() {
       if (!s) return s;
       const next = {
         ...s,
-        children: s.children.map((c) => ({ ...c, items: { ...c.defaults } })),
+        children: s.children.map((c) => ({ ...c, items: { ...c.defaults }, confirmed: false })),
       };
       save(next);
       return next;
@@ -457,6 +468,7 @@ export function useAppState() {
       selectChild,
       resetChild,
       resetAll,
+      toggleConfirm,
       setLocation,
       setThreshold,
       fetchWeather,
