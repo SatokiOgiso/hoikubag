@@ -6,6 +6,7 @@ import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, I
 import { shareUrlFor } from '../lib/storage';
 import { jstDateOffset } from '../lib/date';
 import { ruleLabel } from '../lib/recurring';
+import ConfirmDialog, { type ConfirmOptions } from './ConfirmDialog';
 
 interface Props {
   state: AppState;
@@ -27,7 +28,6 @@ interface Props {
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
     setClosedWeekdays: (days: number[]) => void;
-    resetAll: (date: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
     addRecurringItem: (childId: string, rule: Omit<RecurringItem, 'id'>) => boolean;
@@ -59,6 +59,11 @@ export default function SettingsModal({
   const [joinInput, setJoinInput] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
+
+  // 確認ダイアログ: 開く時に内容と実行内容(onConfirm)をまとめて保持する
+  const [confirm, setConfirm] = useState<(ConfirmOptions & { onConfirm: () => void }) | null>(null);
+  const askConfirm = (opts: ConfirmOptions, onConfirm: () => void) =>
+    setConfirm({ ...opts, onConfirm });
 
   // 定期的な持ち物フォーム用 state
   const [recChildId, setRecChildId] = useState(state.currentChildId);
@@ -142,6 +147,7 @@ export default function SettingsModal({
   };
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-stone-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center">
       <div
         className="bg-stone-50 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl flex flex-col"
@@ -178,7 +184,17 @@ export default function SettingsModal({
                     className="flex-1 bg-transparent px-2 py-1.5 font-bold text-stone-800 focus:outline-none"
                   />
                   <button
-                    onClick={() => actions.removeChild(c.id)}
+                    onClick={() =>
+                      askConfirm(
+                        {
+                          title: `「${c.name}」を削除しますか?`,
+                          message: 'この子どもの準備リスト・デフォルト・定期的な持ち物がすべて削除されます。',
+                          confirmLabel: '削除する',
+                          destructive: true,
+                        },
+                        () => actions.removeChild(c.id)
+                      )
+                    }
                     disabled={state.children.length <= 1}
                     className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center disabled:opacity-30"
                     aria-label="削除"
@@ -211,7 +227,17 @@ export default function SettingsModal({
                     <div className="text-xl w-7 text-center">{item.emoji}</div>
                     <div className="flex-1 text-sm font-bold text-stone-700">{item.key}</div>
                     <button
-                      onClick={() => actions.removeCustomItem(item.key)}
+                      onClick={() =>
+                        askConfirm(
+                          {
+                            title: `「${item.key}」を削除しますか?`,
+                            message: '全員のリストと、入力済みの各日付からこの品目が取り除かれます。',
+                            confirmLabel: '削除する',
+                            destructive: true,
+                          },
+                          () => actions.removeCustomItem(item.key)
+                        )
+                      }
                       className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center"
                       aria-label={`${item.key}を削除`}
                     >
@@ -810,19 +836,6 @@ export default function SettingsModal({
             </div>
           </section>
 
-          {/* 全リセット */}
-          <section>
-            <button
-              onClick={() => {
-                actions.resetAll(selectedDate);
-                onClose();
-              }}
-              className="w-full bg-white rounded-xl py-3 border border-stone-200 text-stone-700 font-bold hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
-            >
-              全員分の準備リストをリセット
-            </button>
-          </section>
-
           {/* 家族との同期 */}
           <section>
             <h3 className="text-sm font-bold text-stone-700 mb-2">📱 家族とのデータ同期</h3>
@@ -936,7 +949,16 @@ export default function SettingsModal({
                     <RefreshCw size={14} /> 今すぐ同期
                   </button>
                   <button
-                    onClick={actions.disableSharing}
+                    onClick={() =>
+                      askConfirm(
+                        {
+                          title: '共有を停止しますか?',
+                          message: 'この端末を家族共有から外します。再参加には招待コードが必要です(共有データ自体は消えません)。',
+                          confirmLabel: '停止する',
+                        },
+                        actions.disableSharing
+                      )
+                    }
                     className="flex-1 bg-white rounded-xl py-2.5 border border-stone-200 text-stone-500 font-bold text-sm hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all"
                   >
                     共有を停止
@@ -951,5 +973,20 @@ export default function SettingsModal({
         </div>
       </div>
     </div>
+
+    {confirm && (
+      <ConfirmDialog
+        title={confirm.title}
+        message={confirm.message}
+        confirmLabel={confirm.confirmLabel}
+        destructive={confirm.destructive}
+        onConfirm={() => {
+          confirm.onConfirm();
+          setConfirm(null);
+        }}
+        onCancel={() => setConfirm(null)}
+      />
+    )}
+    </>
   );
 }

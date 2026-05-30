@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X } from 'lucide-react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X, Users } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { ACCENT } from '../constants';
 import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
 import { effectiveItems, recurringKeys } from '../lib/recurring';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
   child: Child;
@@ -12,11 +13,14 @@ interface Props {
   isHot: boolean;
   isCool: boolean;
   closedWeekdays: number[];
+  childCount: number;
   onChangeItem: (date: string, key: string, delta: number, base?: number) => void;
   onReset: (date: string, id: string) => void;
+  onResetAll: (date: string) => void;
   onToggleConfirm: (date: string) => void;
   onCopyBag: (childId: string, fromDate: string, toDates: string[]) => void;
   onChangeNotes: (date: string, notes: string[]) => void;
+  showToast: (msg: string, undo?: () => void) => void;
 }
 
 function shortDateLabel(d: string): string {
@@ -32,14 +36,18 @@ export default function ItemList({
   isHot,
   isCool,
   closedWeekdays,
+  childCount,
   onChangeItem,
   onReset,
+  onResetAll,
   onToggleConfirm,
   onCopyBag,
   onChangeNotes,
+  showToast,
 }: Props) {
   const [showCopy, setShowCopy] = useState(false);
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
+  const [confirmResetAll, setConfirmResetAll] = useState(false);
 
   const effectiveCounts = effectiveItems(child, date);
   const recKeys = recurringKeys(child, date);
@@ -69,9 +77,19 @@ export default function ItemList({
   };
 
   const removeNote = (i: number) => {
+    const before = localNotes;
+    const removed = localNotes[i];
     const next = localNotes.filter((_, j) => j !== i);
     setLocalNotes(next);
     onChangeNotes(date, next);
+    // 入力済みのメモを消した時だけ取り消しを提示(空欄の削除は通知不要)
+    if (removed.trim()) {
+      showToast(`「${removed.trim()}」を削除しました`, () => {
+        setLocalNotes(before);
+        onChangeNotes(date, before);
+        showToast('元に戻しました');
+      });
+    }
   };
 
   const toggleCopyTarget = (d: string) => {
@@ -81,6 +99,7 @@ export default function ItemList({
   };
 
   return (
+    <>
     <div className="px-5">
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-sm font-bold text-stone-700">
@@ -270,7 +289,7 @@ export default function ItemList({
       </button>
 
       {/* 他の日にコピー */}
-      <div className="mt-3 mb-8">
+      <div className="mt-3">
         <button
           onClick={() => {
             setShowCopy((v) => !v);
@@ -337,6 +356,34 @@ export default function ItemList({
           </div>
         )}
       </div>
+
+      {/* 家族全員分のリセット(子どもが複数いる時だけ) */}
+      {childCount > 1 && (
+        <div className="mb-8">
+          <button
+            onClick={() => setConfirmResetAll(true)}
+            className="w-full py-2.5 rounded-xl border border-stone-200 bg-white text-stone-400 text-sm font-bold flex items-center justify-center gap-1.5 hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all"
+          >
+            <Users size={14} />
+            全員分をこの日にリセット
+          </button>
+        </div>
+      )}
     </div>
+
+    {confirmResetAll && (
+      <ConfirmDialog
+        title="全員分をリセットしますか?"
+        message={`${shortDateLabel(date)}の全員の準備リストがデフォルトに戻ります。`}
+        confirmLabel="リセットする"
+        destructive
+        onConfirm={() => {
+          onResetAll(date);
+          setConfirmResetAll(false);
+        }}
+        onCancel={() => setConfirmResetAll(false)}
+      />
+    )}
+    </>
   );
 }
