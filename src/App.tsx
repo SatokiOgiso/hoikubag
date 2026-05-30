@@ -1,10 +1,9 @@
-import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, RefreshCw } from 'lucide-react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
-import WeatherCard from './components/WeatherCard';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
@@ -18,12 +17,24 @@ export default function App() {
     syncError,
     forecast,
     weatherLoading,
-    weatherError,
     selectedDate,
     setSelectedDate,
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
+  const [fontScale, setFontScaleState] = useState<number>(() => {
+    const s = localStorage.getItem('fontScale');
+    return s ? parseFloat(s) : 1.0;
+  });
+  const setFontScale = (v: number) => {
+    const next = Math.round(Math.min(1.5, Math.max(0.7, v)) * 10) / 10;
+    setFontScaleState(next);
+    localStorage.setItem('fontScale', String(next));
+  };
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${fontScale * 16}px`;
+    return () => { document.documentElement.style.fontSize = ''; };
+  }, [fontScale]);
 
   if (loading || !state) {
     return (
@@ -60,21 +71,52 @@ export default function App() {
 
       <div className="relative max-w-lg mx-auto">
         {/* ヘッダー */}
-        <header className="px-5 pt-7 pb-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-[10px] tracking-[0.35em] text-stone-500 font-medium mb-1">
-                DAYCARE · PREP
+        <header className="px-5 pt-5 pb-3">
+          <div className="flex items-center justify-between">
+            {/* ロゴ */}
+            <div className="flex items-center gap-2">
+              <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
+                <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* ハンドル */}
+                  <path d="M38 22 Q38 12 50 12 Q62 12 62 22" stroke="#D4A017" strokeWidth="7" strokeLinecap="round" fill="none"/>
+                  {/* 本体 */}
+                  <rect x="14" y="24" width="72" height="54" rx="16" fill="#F5C518"/>
+                  {/* ポケット仕切り線 */}
+                  <path d="M14 56 Q50 62 86 56" stroke="#D4A017" strokeWidth="3.5" fill="none"/>
+                  {/* 服(青) */}
+                  <ellipse cx="40" cy="44" rx="12" ry="10" fill="#A8C4DC" opacity="0.9"/>
+                  {/* 服(緑) */}
+                  <ellipse cx="54" cy="46" rx="14" ry="11" fill="#A8D4A8" opacity="0.9"/>
+                  {/* サイドポケット左 */}
+                  <rect x="6" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+                  {/* サイドポケット右 */}
+                  <rect x="82" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+                </svg>
               </div>
-              <h1 className="text-3xl font-black text-stone-800 leading-tight">保育園準備</h1>
+              <span className="text-2xl font-black text-stone-800 tracking-tight">hoikubag</span>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
-              aria-label="設定"
-            >
-              <Settings size={18} className="text-stone-600" />
-            </button>
+            <div className="flex items-center gap-2">
+              {state.location?.name && (
+                <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 h-14">
+                  <span className="text-[15px] text-stone-500 font-bold">📍 {state.location.name}</span>
+                  <button
+                    onClick={() => actions.fetchWeather()}
+                    disabled={weatherLoading}
+                    className="text-stone-400 active:scale-90 transition-all disabled:opacity-50"
+                    aria-label="天気を再取得"
+                  >
+                    <RefreshCw size={15} className={weatherLoading ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="設定"
+              >
+                <Settings size={22} className="text-stone-600" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -85,16 +127,6 @@ export default function App() {
           threshold={threshold}
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           onSelectDate={setSelectedDate}
-        />
-
-        <WeatherCard
-          locationName={state.location?.name}
-          forecast={forecast}
-          threshold={threshold}
-          selectedDate={selectedDate}
-          weatherLoading={weatherLoading}
-          weatherError={weatherError}
-          onFetchWeather={actions.fetchWeather}
         />
 
         <BagSummary
@@ -127,6 +159,8 @@ export default function App() {
           syncStatus={syncStatus}
           syncError={syncError}
           selectedDate={selectedDate}
+          fontScale={fontScale}
+          onFontScale={setFontScale}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />

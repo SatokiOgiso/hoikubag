@@ -14,6 +14,8 @@ interface Props {
   syncStatus: SyncStatus;
   syncError: string | null;
   selectedDate: string;
+  fontScale: number;
+  onFontScale: (v: number) => void;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -45,6 +47,8 @@ export default function SettingsModal({
   syncStatus,
   syncError,
   selectedDate,
+  fontScale,
+  onFontScale,
   onClose,
   actions,
 }: Props) {
@@ -750,6 +754,36 @@ export default function SettingsModal({
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          {/* 文字サイズ */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-2">文字サイズ</h3>
+            <div className="bg-white rounded-xl p-4 border border-stone-200">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onFontScale(fontScale - 0.1)}
+                  disabled={fontScale <= 0.7}
+                  className="w-11 h-11 rounded-xl bg-stone-100 text-stone-700 flex items-center justify-center active:scale-90 transition-all disabled:opacity-30"
+                  aria-label="文字を小さく"
+                >
+                  <Minus size={18} />
+                </button>
+                <div className="flex-1 text-center">
+                  <div className="font-black text-2xl text-stone-800">{Math.round(fontScale * 100)}%</div>
+                  <div className="text-xs text-stone-400 mt-0.5">70% 〜 150%</div>
+                </div>
+                <button
+                  onClick={() => onFontScale(fontScale + 0.1)}
+                  disabled={fontScale >= 1.5}
+                  className="w-11 h-11 rounded-xl text-white flex items-center justify-center active:scale-90 transition-all disabled:opacity-30"
+                  style={{ background: ACCENT }}
+                  aria-label="文字を大きく"
+                >
+                  <Plus size={18} />
+                </button>
+              </div>
             </div>
           </section>
 
