@@ -13,11 +13,6 @@ interface Props {
   onFetchWeather: () => void;
 }
 
-const SOURCE_NOTE: Record<string, string> = {
-  jma: '今日・明日: 気象庁 / 昨日: Open-Meteo',
-  'open-meteo': 'Open-Meteo',
-};
-
 /** 日付(YYYY-MM-DD)→ 「5/31(日)」(JST基準) */
 function shortDate(date: string): string {
   const [, mm, dd] = date.split('-');
@@ -67,7 +62,6 @@ export default function WeatherCard({
   const tHigh = day?.high ?? null;
   const isHot = tHigh != null && tHigh > threshold;
   const isCool = tHigh != null && tHigh <= threshold;
-  const sourceNote = forecast ? (SOURCE_NOTE[forecast.source] ?? '') : '';
   const Icon = iconFromLabel(day?.label);
 
   return (
