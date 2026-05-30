@@ -170,6 +170,7 @@ export default function App() {
           selectedDate={selectedDate}
           fontScale={fontScale}
           onFontScale={setFontScale}
+          showToast={showToast}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />
