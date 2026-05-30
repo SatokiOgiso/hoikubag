@@ -29,6 +29,7 @@ export interface DayForecast {
   high: number | null; // 最高気温(°C)
   low: number | null; // 最低気温(°C)
   label: string; // 例: "晴れ", "くもり時々雨"
+  reliability?: string | null; // 気象庁の予報精度 'A' | 'B' | 'C' | null
 }
 
 /** 取得した予報(昨日・今日・明日の3日分など) */

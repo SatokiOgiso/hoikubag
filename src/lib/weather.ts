@@ -77,6 +77,85 @@ const hasData = (d: DayForecast | null): d is DayForecast =>
 
 // ---- 気象庁 ----
 
+/** 気象庁週間予報コード → 日本語ラベル */
+const JMA_WEEK_CODES: Record<number, string> = {
+  100: '晴れ', 101: '晴れ時々くもり', 102: '晴れ一時雨', 103: '晴れ時々雨',
+  104: '晴れ一時雪', 105: '晴れ時々雪', 106: '晴れ一時雨か雪', 107: '晴れ時々雨か雪',
+  108: '晴れ一時雨か雷雨', 110: '晴れ後くもり', 111: '晴れ後くもり一時雨',
+  112: '晴れ後一時雨', 113: '晴れ後時々雨', 114: '晴れ後雨', 115: '晴れ後一時雪か雨',
+  116: '晴れ後雪か雨', 117: '晴れ後雨か雪', 118: '晴れ後雨か雪', 119: '晴れ後くもりか雨',
+  120: '晴れ朝夕一時雨', 121: '晴れ朝の内一時雨', 123: '晴れ昼頃から雨',
+  124: '晴れ夕方から雨', 125: '晴れ夜は雨', 126: '晴れ昼頃から雨',
+  127: '晴れ夕方から雨', 128: '晴れ夜から雨', 130: '朝の内霧後晴れ',
+  131: '晴れ明け方霧', 132: '晴れ朝夕くもり', 140: '晴れ時々くもり一時雨',
+  160: '晴れ一時雪か雨', 170: '晴れ時々くもり一時雪か雨', 181: '晴れ後雪か雨',
+  200: 'くもり', 201: 'くもり時々晴れ', 202: 'くもり一時雨', 203: 'くもり時々雨',
+  204: 'くもり一時雪', 205: 'くもり時々雪', 206: 'くもり一時雨か雪',
+  207: 'くもり時々雨か雪', 208: 'くもり一時雨か雷雨', 209: '霧',
+  210: 'くもり後晴れ', 211: 'くもり後晴れ一時雨', 212: 'くもり後一時雨',
+  213: 'くもり後時々雨', 214: 'くもり後雨', 215: 'くもり後雪か雨',
+  217: 'くもり後雨か雪', 218: 'くもり後雨か雪', 219: 'くもり後晴れか雨',
+  220: 'くもり朝夕一時雨', 221: 'くもり朝の内一時雨', 222: 'くもり夕方一時雨',
+  223: 'くもり日中時々晴れ', 224: 'くもり昼頃から雨', 225: 'くもり夕方から雨',
+  226: 'くもり夜は雨', 228: 'くもり昼頃から雨', 229: 'くもり夕方から雨',
+  230: 'くもり夜から雨', 231: 'くもり海上海岸は霧か霧雨', 240: 'くもり時々雨一時雷雨',
+  250: 'くもり時々雪', 260: 'くもり一時雪か雨', 270: 'くもり時々雪か雨',
+  281: 'くもり後雪か雨',
+  300: '雨', 301: '雨時々晴れ', 302: '雨時々くもり', 303: '雨時々雪',
+  304: '雨か雪', 306: '大雨', 308: '雨で暴風を伴う', 309: '雨一時雪',
+  311: '雨後晴れ', 313: '雨後くもり', 314: '雨後時々くもり', 315: '雨後雪か雨',
+  316: '雨後くもり一時雪', 317: '雨後くもり一時雪', 320: '朝の内雨後晴れ',
+  321: '朝の内雨後くもり', 322: '雨朝晩一時雪', 323: '雨昼頃から晴れ',
+  324: '雨夕方から晴れ', 325: '雨夜は晴れ', 326: '雨夕方から雪',
+  327: '雨夜から雪', 328: '雨一時強く降る', 329: '雨一時みぞれ',
+  340: '雪か雨', 350: '雨で雷を伴う', 361: '雪か雨後晴れ', 371: '雪か雨後くもり',
+  400: '雪', 401: '雪時々晴れ', 402: '雪時々くもり', 403: '雪時々雨',
+  405: '大雪', 406: '風雪強い', 407: '暴風雪', 409: '雪一時雨',
+  411: '雪後晴れ', 413: '雪後くもり', 414: '雪後雨', 420: '朝の内雪後晴れ',
+  421: '朝の内雪後くもり', 422: '雪昼頃から雨', 423: '雪夕方から雨',
+  425: '雪一時強く降る', 426: '雪後みぞれ', 427: '雪一時みぞれ', 450: '雪で雷を伴う',
+};
+
+function jmaCodeToLabel(code: string | number | null | undefined): string {
+  if (code == null) return '';
+  const n = Number(String(code).trim());
+  return JMA_WEEK_CODES[n] ?? '';
+}
+
+/** 気象庁週間予報 JSON から全日分の予報(天気コード+気温+信頼度)を抽出 */
+export function parseJmaWeeklyDays(json: unknown): DayForecast[] {
+  const root = (Array.isArray(json) ? json : []) as any[];
+  const weekly = root[1];
+  if (!weekly) return [];
+
+  const wts0 = weekly.timeSeries?.[0]; // 天気コード + 降水確率 + 信頼度
+  const wts1 = weekly.timeSeries?.[1]; // 気温
+
+  if (!wts0 || !Array.isArray(wts0.timeDefines)) return [];
+
+  return (wts0.timeDefines as unknown[]).map((timeStr, i) => {
+    const date = dateOf(timeStr);
+    const area0 = wts0.areas?.[0];
+    const label = jmaCodeToLabel(area0?.weatherCodes?.[i]);
+    const rawRel = area0?.reliabilities?.[i];
+    const reliability = rawRel && /^[A-C]$/i.test(String(rawRel)) ? String(rawRel).toUpperCase() : null;
+
+    let high: number | null = null;
+    let low: number | null = null;
+
+    if (wts1 && Array.isArray(wts1.timeDefines)) {
+      const ti = (wts1.timeDefines as unknown[]).findIndex((t) => dateOf(t) === date);
+      if (ti >= 0) {
+        const area1 = wts1.areas?.[0];
+        high = toTemp(area1?.tempsMax?.[ti]);
+        low = toTemp(area1?.tempsMin?.[ti]);
+      }
+    }
+
+    return { date, high, low, label, reliability };
+  });
+}
+
 /** 気象庁 forecast JSON から指定日(YYYY-MM-DD)の予報を取り出す */
 export function parseJmaDay(json: unknown, date: string): DayForecast {
   const root = (Array.isArray(json) ? json : []) as any[];
@@ -188,7 +267,7 @@ async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
 // ---- 統合 ----
 
 /**
- * 昨日(Open-Meteo)+ 今日・明日(気象庁)の3日分を取得。
+ * 昨日(Open-Meteo)+ 今日・明日(気象庁短期)+ 明後日〜7日後(気象庁週間)を取得。
  * 気象庁が失敗した日は Open-Meteo で補完する。
  */
 export async function fetchForecast(locationName: string): Promise<Forecast> {
@@ -206,9 +285,11 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
 
   let today: DayForecast | null = null;
   let tomorrow: DayForecast | null = null;
+  let weeklyDays: DayForecast[] = [];
   if (jmaRes.status === 'fulfilled') {
     today = parseJmaDay(jmaRes.value, tId);
     tomorrow = parseJmaDay(jmaRes.value, mId);
+    weeklyDays = parseJmaWeeklyDays(jmaRes.value);
   }
 
   // 今日・明日が気象庁で取れたか(取れなければ Open-Meteo で補完)
@@ -219,7 +300,15 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
   // 昨日は常に Open-Meteo
   const yesterday = omOf(yId);
 
-  const days = [yesterday, today, tomorrow].filter(hasData);
+  // 週間予報から明後日〜7日後を追加
+  const futureDays: DayForecast[] = [];
+  for (let off = 2; off <= 7; off++) {
+    const dateId = jstDateOffset(off);
+    const d = weeklyDays.find((w) => w.date === dateId) ?? null;
+    if (d && hasData(d)) futureDays.push(d);
+  }
+
+  const days = [yesterday, today, tomorrow, ...futureDays].filter(hasData);
   if (days.length === 0) {
     const reasons = [jmaRes, omRes]
       .filter((r) => r.status === 'rejected')

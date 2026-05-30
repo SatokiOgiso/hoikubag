@@ -114,6 +114,24 @@ export default function DateStrip({ selectedDate, forecast, onSelectDate }: Prop
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>
+              {/* 予報精度バッジ (A/B/C) */}
+              {day?.reliability ? (
+                <span
+                  className={`text-[10px] font-black leading-none px-1 py-0.5 rounded-md ${
+                    active
+                      ? 'bg-white/20 text-white'
+                      : day.reliability === 'A'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : day.reliability === 'B'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-600'
+                  }`}
+                >
+                  {day.reliability}
+                </span>
+              ) : (
+                <span className="h-[18px]" />
+              )}
             </button>
           );
         })}
