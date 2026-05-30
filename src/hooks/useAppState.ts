@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppState, Child, Item } from '../types';
+import type { AppState, Child, Item, RecurringItem } from '../types';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from '../constants';
+import { matchesRecurring } from '../lib/recurring';
 import {
   createProvider,
   getStoredFamilyId,
@@ -176,14 +177,25 @@ export function useAppState() {
   );
 
   const changeItem = useCallback(
-    (date: string, key: string, delta: number) => {
+    (date: string, key: string, delta: number, effectiveBase?: number) => {
       setState((s) => {
         if (!s) return s;
+        const currentChild = s.children.find((c) => c.id === s.currentChildId);
+        const hasRecurring = (currentChild?.recurringItems ?? []).some(
+          (r) => r.itemKey === key && matchesRecurring(r, date)
+        );
         const next = mapCurrentBag(s, date, (b) => {
           const items = { ...b.items };
-          const v = Math.max(0, (items[key] || 0) + delta);
-          if (v === 0) delete items[key];
-          else items[key] = v;
+          const current = effectiveBase !== undefined ? effectiveBase : (items[key] || 0);
+          const v = Math.max(0, current + delta);
+          if (v === 0 && hasRecurring) {
+            // 定期品目を明示的にゼロにするセンチネル(定期ルールが上書きされないようにする)
+            items[key] = 0;
+          } else if (v === 0) {
+            delete items[key];
+          } else {
+            items[key] = v;
+          }
           // 確定後に内容を変えたら確定を解除する
           return { items, confirmed: false };
         });
@@ -512,6 +524,77 @@ export function useAppState() {
     [save]
   );
 
+  // ---- 定期的な持ち物 ----
+
+  const addRecurringItem = useCallback(
+    (childId: string, rule: Omit<RecurringItem, 'id'>): boolean => {
+      if (!rule.itemKey.trim()) {
+        showToast('品目を選択してください');
+        return false;
+      }
+      setState((s) => {
+        if (!s) return s;
+        const newRule: RecurringItem = { ...rule, id: uid() };
+        const next: AppState = {
+          ...s,
+          children: s.children.map((c) =>
+            c.id === childId
+              ? { ...c, recurringItems: [...(c.recurringItems ?? []), newRule] }
+              : c
+          ),
+        };
+        save(next);
+        return next;
+      });
+      showToast('定期的な持ち物を追加しました');
+      return true;
+    },
+    [save, showToast]
+  );
+
+  const updateRecurringItem = useCallback(
+    (childId: string, rule: RecurringItem) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          children: s.children.map((c) =>
+            c.id === childId
+              ? {
+                  ...c,
+                  recurringItems: (c.recurringItems ?? []).map((r) =>
+                    r.id === rule.id ? rule : r
+                  ),
+                }
+              : c
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  const removeRecurringItem = useCallback(
+    (childId: string, ruleId: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          children: s.children.map((c) =>
+            c.id === childId
+              ? { ...c, recurringItems: (c.recurringItems ?? []).filter((r) => r.id !== ruleId) }
+              : c
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   // ---- 家族共有 ----
 
   /** 共有を開始: 新しい familyId を発行し、現在のデータをクラウドへアップロード */
@@ -589,6 +672,9 @@ export function useAppState() {
       fetchWeather,
       addCustomItem,
       removeCustomItem,
+      addRecurringItem,
+      updateRecurringItem,
+      removeRecurringItem,
       enableSharing,
       disableSharing,
       syncNow,

@@ -2,6 +2,7 @@ import { Check } from 'lucide-react';
 import type { AppState, Item } from '../types';
 import { getBag } from '../types';
 import { dateLabel } from '../lib/date';
+import { effectiveItems } from '../lib/recurring';
 
 interface Props {
   state: AppState;
@@ -25,7 +26,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
         <div className="flex flex-col gap-1.5">
           {state.children.map((c) => {
             const bag = getBag(c, date);
-            const cItems = bag.items;
+            const cItems = effectiveItems(c, date);
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
             const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
             const active = c.id === state.currentChildId;

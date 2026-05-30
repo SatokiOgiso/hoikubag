@@ -7,11 +7,29 @@ export interface DayBag {
   notes?: string[]; // その日限りのメモ(書類名など)
 }
 
+export type RecurrenceType = 'weekly' | 'monthly';
+
+export type MonthlyPattern =
+  | { kind: 'dayOfMonth'; day: number }
+  | { kind: 'nthWeekday'; nth: number; weekday: number };
+
+export interface RecurringItem {
+  id: string;
+  itemKey: string;
+  qty: number;
+  type: RecurrenceType;
+  weekdays?: number[];    // weekly 用(0=日..6=土)
+  interval?: number;      // weekly 用: N週ごと(1=毎週、2=隔週…)
+  anchorDate?: string;    // interval>1 の基準日(YYYY-MM-DD)
+  monthlyPattern?: MonthlyPattern;
+}
+
 export interface Child {
   id: ChildId;
   name: string; // 例: "太郎"
   bags: Record<string, DayBag>; // 日付(YYYY-MM-DD)ごとのかばん
   defaults: Record<string, number>; // リセット時の初期値。例: { "おむつ": 3, "肌着": 1 }
+  recurringItems?: RecurringItem[];
   // 旧形式(マイグレーション用・読み込み時のみ)
   items?: Record<string, number>;
   confirmed?: boolean;
