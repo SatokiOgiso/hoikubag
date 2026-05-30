@@ -4,7 +4,6 @@ import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
-import WeatherCard from './components/WeatherCard';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
@@ -17,8 +16,6 @@ export default function App() {
     syncStatus,
     syncError,
     forecast,
-    weatherLoading,
-    weatherError,
     selectedDate,
     setSelectedDate,
     actions,
@@ -85,16 +82,6 @@ export default function App() {
           threshold={threshold}
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           onSelectDate={setSelectedDate}
-        />
-
-        <WeatherCard
-          locationName={state.location?.name}
-          forecast={forecast}
-          threshold={threshold}
-          selectedDate={selectedDate}
-          weatherLoading={weatherLoading}
-          weatherError={weatherError}
-          onFetchWeather={actions.fetchWeather}
         />
 
         <BagSummary

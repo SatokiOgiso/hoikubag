@@ -11,8 +11,7 @@ interface Props {
   onSelectDate: (date: string) => void;
 }
 
-// 表示する日付の範囲: 昨日 〜 7日後
-const DATE_RANGE = Array.from({ length: 9 }, (_, i) => i - 1); // -1..7
+const DATE_RANGE = Array.from({ length: 9 }, (_, i) => i - 1);
 
 function relativeLabel(date: string): string {
   if (date === jstDateOffset(-1)) return '昨日';
@@ -21,7 +20,6 @@ function relativeLabel(date: string): string {
   return '';
 }
 
-// 気温→色(WeatherCard と同じアンカー: 15緑→25赤橙→30赤→35紫)
 const TEMP_STOPS: { t: number; c: [number, number, number] }[] = [
   { t: 15, c: [22, 163, 74] },
   { t: 25, c: [234, 88, 12] },
@@ -45,19 +43,25 @@ function tempColor(t: number | null): string {
   return '#A8A29E';
 }
 
-function weekdayColor(wdNum: number, active: boolean): string {
-  if (active) return 'text-white/80';
-  if (wdNum === 0) return 'text-red-500'; // 日
-  if (wdNum === 6) return 'text-blue-500'; // 土
+function weekdayColor(wdNum: number): string {
+  if (wdNum === 0) return 'text-red-500';
+  if (wdNum === 6) return 'text-blue-500';
   return 'text-stone-500';
 }
 
+function weatherIconClass(label: string | undefined): string {
+  if (!label) return 'text-stone-400';
+  if (label.includes('晴')) return 'text-orange-400';
+  if (label.includes('雪')) return 'text-sky-300';
+  if (label.includes('雨')) return 'text-blue-400';
+  return 'text-stone-400';
+}
+
 /** 日付ストリップ(最上部・横スクロール・日付選択) */
-export default function DateStrip({ selectedDate, forecast, closedWeekdays, onSelectDate }: Props) {
+export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, onSelectDate }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
-  // 選択中の日付が見える位置へスクロール
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [selectedDate]);
@@ -80,72 +84,53 @@ export default function DateStrip({ selectedDate, forecast, closedWeekdays, onSe
           const Icon = day ? iconFromLabel(day.label) : null;
           const wdNum = jstWeekdayNum(date);
           const isClosed = closedWeekdays.includes(wdNum);
+          const isHot = day?.high != null && day.high > threshold;
+          const isCool = day?.high != null && day.high <= threshold;
           return (
             <button
               key={date}
               ref={active ? selectedRef : undefined}
               onClick={() => onSelectDate(date)}
-              className={`shrink-0 w-[68px] snap-center rounded-2xl py-2.5 flex flex-col items-center gap-0.5 transition-all active:scale-95 ${
-                active
-                  ? 'bg-stone-800 text-white shadow-md'
-                  : 'bg-white text-stone-600 border border-stone-200'
+              className={`shrink-0 w-[68px] snap-center rounded-2xl py-2.5 flex flex-col items-center gap-0.5 transition-all active:scale-95 border ${
+                active ? 'shadow-sm' : 'bg-white text-stone-600 border-stone-200'
               }`}
+              style={active ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' } : undefined}
             >
-              <span className={`text-[11px] font-bold ${weekdayColor(wdNum, active)}`}>
+              <span className={`text-[11px] font-bold ${weekdayColor(wdNum)}`}>
                 {rel || jstWeekday(date)}
               </span>
-              <span className="text-base font-black leading-none">
+              <span className="text-base font-black leading-none text-stone-800">
                 {Number(mm)}/{Number(dd)}
               </span>
               {Icon ? (
                 <Icon
                   size={20}
                   strokeWidth={1.6}
-                  className={active ? 'text-white/90 my-0.5' : 'text-stone-500 my-0.5'}
+                  className={`my-0.5 ${weatherIconClass(day?.label)}`}
                 />
               ) : (
                 <span className="my-0.5 h-5" />
               )}
-              {/* 最低/最高(簡潔に) */}
               <span className="flex items-baseline gap-0.5 font-black leading-none">
-                <span
-                  className="text-[11px]"
-                  style={{ color: active ? 'rgba(255,255,255,0.7)' : tempColor(day?.low ?? null) }}
-                >
+                <span className="text-[11px]" style={{ color: tempColor(day?.low ?? null) }}>
                   {day?.low != null ? `${day.low}°` : '—'}
                 </span>
-                <span className={active ? 'text-white/40 text-[10px]' : 'text-stone-300 text-[10px]'}>
-                  /
-                </span>
-                <span
-                  className="text-[12px]"
-                  style={{ color: active ? '#fff' : tempColor(day?.high ?? null) }}
-                >
+                <span className="text-stone-300 text-[10px]">/</span>
+                <span className="text-[12px]" style={{ color: tempColor(day?.high ?? null) }}>
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>
-              {/* 下段バッジ: 休日 > 予報精度 > 空スペース */}
               {isClosed ? (
-                <span
-                  className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${
-                    active ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-400'
-                  }`}
-                >
+                <span className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${active ? 'bg-orange-200/60 text-orange-700' : 'bg-stone-100 text-stone-400'}`}>
                   休
                 </span>
-              ) : day?.reliability ? (
-                <span
-                  className={`text-[10px] font-black leading-none px-1 py-0.5 rounded-md ${
-                    active
-                      ? 'bg-white/20 text-white'
-                      : day.reliability === 'A'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : day.reliability === 'B'
-                      ? 'bg-amber-100 text-amber-700'
-                      : 'bg-red-100 text-red-600'
-                  }`}
-                >
-                  {day.reliability}
+              ) : (isHot || isCool) ? (
+                <span className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${
+                  isHot
+                    ? active ? 'bg-orange-200/60 text-orange-600' : 'bg-orange-50 text-orange-500'
+                    : active ? 'bg-sky-200/60 text-sky-600' : 'bg-sky-50 text-sky-500'
+                }`}>
+                  {isHot ? '半袖' : '長袖'}
                 </span>
               ) : (
                 <span className="h-[18px]" />
