@@ -7,9 +7,9 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     data = { title: 'hoikubag', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'hoikubag';
+  const title = data.title || '明日のかばんの中身を確定しましたか?';
   const options = {
-    body: data.body || '明日の保育園の準備はできていますか?',
+    body: data.body || '降園時に、明日の持ち物を入力して確定しておきましょう。',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: data.tag || 'hoikubag-reminder',

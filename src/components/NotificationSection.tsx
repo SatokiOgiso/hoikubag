@@ -57,8 +57,10 @@ export default function NotificationSection({ familyId, showToast }: Props) {
     <section>
       <h3 className="text-sm font-bold text-stone-700 mb-2">🔔 準備リマインド通知</h3>
       <div className="text-xs text-stone-500 mb-2 leading-relaxed">
-        毎晩20時ごろ「明日の準備はできていますか?」とお知らせします。
-        {familyId && '家族全員が確定済みの日は届きません。'}
+        毎日夕方18時ごろ「明日のかばんの中身を確定しましたか?」とお知らせします。
+        {familyId
+          ? '家族全員が確定済みの日は届きません。'
+          : '家族共有を有効にすると、確定済みの日は届かなくなります。'}
       </div>
 
       {!supported ? (

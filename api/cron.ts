@@ -100,8 +100,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let removed = 0;
 
     const payload = JSON.stringify({
-      title: '保育園の準備リマインド',
-      body: '明日の持ち物の準備はできていますか?',
+      title: '明日のかばんの中身を確定しましたか?',
+      body: '降園時に、明日の持ち物を入力して確定しておきましょう。',
       url: '/',
       tag: 'hoikubag-reminder',
     });
