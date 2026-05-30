@@ -110,9 +110,11 @@ export default function App() {
           items={allItems}
           isHot={isHot}
           isCool={isCool}
+          closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           onChangeItem={actions.changeItem}
           onReset={actions.resetChild}
           onToggleConfirm={actions.toggleConfirm}
+          onCopyBag={actions.copyBag}
         />
       </div>
 

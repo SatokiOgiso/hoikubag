@@ -1,7 +1,9 @@
-import { Plus, Minus, RefreshCw, AlertTriangle, Check } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { getBag } from '../types';
 import { ACCENT } from '../constants';
+import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
 
 interface Props {
   child: Child;
@@ -9,9 +11,16 @@ interface Props {
   items: Item[];
   isHot: boolean;
   isCool: boolean;
+  closedWeekdays: number[];
   onChangeItem: (date: string, key: string, delta: number) => void;
   onReset: (date: string, id: string) => void;
   onToggleConfirm: (date: string) => void;
+  onCopyBag: (childId: string, fromDate: string, toDates: string[]) => void;
+}
+
+function shortDateLabel(d: string): string {
+  const [, mm, dd] = d.split('-');
+  return `${Number(mm)}/${Number(dd)}(${jstWeekday(d)})`;
 }
 
 /** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告・選択日) */
@@ -21,14 +30,29 @@ export default function ItemList({
   items: itemDefs,
   isHot,
   isCool,
+  closedWeekdays,
   onChangeItem,
   onReset,
   onToggleConfirm,
+  onCopyBag,
 }: Props) {
+  const [showCopy, setShowCopy] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<string[]>([]);
+
   const bag = getBag(child, date);
   const items = bag.items;
   const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
   const confirmed = !!bag.confirmed;
+
+  const copyDates = Array.from({ length: 9 }, (_, i) => jstDateOffset(i - 1)).filter(
+    (d) => d !== date
+  );
+
+  const toggleCopyTarget = (d: string) => {
+    setCopyTargets((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+    );
+  };
 
   return (
     <div className="px-5">
@@ -119,7 +143,7 @@ export default function ItemList({
         })}
       </div>
 
-      {/* 確定ボタン(確定/取り消しをトグル) */}
+      {/* 確定ボタン */}
       <button
         onClick={() => onToggleConfirm(date)}
         className={`w-full mt-4 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all ${
@@ -132,6 +156,75 @@ export default function ItemList({
         <Check size={22} strokeWidth={3} />
         {confirmed ? `${child.name}の確定を取り消す` : `${child.name}の準備を確定する`}
       </button>
+
+      {/* 他の日にコピー */}
+      <div className="mt-3 mb-8">
+        <button
+          onClick={() => {
+            setShowCopy((v) => !v);
+            if (showCopy) setCopyTargets([]);
+          }}
+          className="w-full py-2.5 rounded-xl border border-stone-200 bg-white text-stone-500 text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+        >
+          <Copy size={14} />
+          他の日にコピー
+          <span className="text-xs opacity-60">{showCopy ? '▴' : '▾'}</span>
+        </button>
+
+        {showCopy && (
+          <div className="mt-2 p-3 rounded-xl bg-stone-50 border border-stone-200">
+            <div className="text-[11px] text-stone-500 mb-2 font-bold">コピー先の日付を選択</div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {copyDates.map((d) => {
+                const wday = jstWeekdayNum(d);
+                const isClosed = closedWeekdays.includes(wday);
+                const isSelected = copyTargets.includes(d);
+                const isSun = wday === 0;
+                const isSat = wday === 6;
+                return (
+                  <button
+                    key={d}
+                    onClick={() => toggleCopyTarget(d)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                      isSelected
+                        ? isSun
+                          ? 'bg-red-500 text-white'
+                          : isSat
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-stone-700 text-white'
+                        : isClosed
+                        ? isSun
+                          ? 'bg-red-50 text-red-300 border border-red-100'
+                          : isSat
+                          ? 'bg-blue-50 text-blue-300 border border-blue-100'
+                          : 'bg-stone-100 text-stone-300 border border-stone-200'
+                        : isSun
+                        ? 'bg-red-50 text-red-600 border border-red-200'
+                        : isSat
+                        ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                        : 'bg-white text-stone-600 border border-stone-200'
+                    }`}
+                  >
+                    {shortDateLabel(d)}
+                  </button>
+                );
+              })}
+            </div>
+            {copyTargets.length > 0 && (
+              <button
+                onClick={() => {
+                  onCopyBag(child.id, date, copyTargets);
+                  setCopyTargets([]);
+                  setShowCopy(false);
+                }}
+                className="w-full py-2.5 rounded-xl bg-stone-700 text-white text-sm font-bold active:scale-95 transition-all"
+              >
+                {copyTargets.length}日にコピーする
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

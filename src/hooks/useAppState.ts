@@ -362,6 +362,36 @@ export function useAppState() {
     [save]
   );
 
+  const copyBag = useCallback(
+    (childId: string, fromDate: string, toDates: string[]) => {
+      setState((s) => {
+        if (!s) return s;
+        const child = s.children.find((c) => c.id === childId);
+        if (!child) return s;
+        const fromItems = child.bags?.[fromDate]?.items ?? {};
+        const next: AppState = {
+          ...s,
+          children: s.children.map((c) => {
+            if (c.id !== childId) return c;
+            const bags = { ...c.bags };
+            for (const d of toDates) {
+              bags[d] = { items: { ...fromItems }, confirmed: false };
+            }
+            return { ...c, bags };
+          }),
+        };
+        save(next);
+        return next;
+      });
+      const label =
+        toDates.length === 1
+          ? toDates[0].slice(5).replace('-', '/') + 'にコピーしました'
+          : `${toDates.length}日にコピーしました`;
+      showToast(label);
+    },
+    [save, showToast]
+  );
+
   const setClosedWeekdays = useCallback(
     (closedWeekdays: number[]) => {
       setState((s) => {
@@ -536,6 +566,7 @@ export function useAppState() {
       toggleConfirm,
       setLocation,
       setThreshold,
+      copyBag,
       setClosedWeekdays,
       fetchWeather,
       addCustomItem,
