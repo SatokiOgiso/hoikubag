@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, RefreshCw } from 'lucide-react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
-import WeatherCard from './components/WeatherCard';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
@@ -18,7 +17,6 @@ export default function App() {
     syncError,
     forecast,
     weatherLoading,
-    weatherError,
     selectedDate,
     setSelectedDate,
     actions,
@@ -68,13 +66,28 @@ export default function App() {
               </div>
               <h1 className="text-3xl font-black text-stone-800 leading-tight">保育園準備</h1>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
-              aria-label="設定"
-            >
-              <Settings size={18} className="text-stone-600" />
-            </button>
+            <div className="flex items-center gap-2">
+              {state.location?.name && (
+                <div className="flex items-center gap-1.5 bg-white border border-stone-200 rounded-2xl px-3 h-11">
+                  <span className="text-[11px] text-stone-500 font-bold">📍 {state.location.name}</span>
+                  <button
+                    onClick={() => actions.fetchWeather()}
+                    disabled={weatherLoading}
+                    className="text-stone-400 active:scale-90 transition-all disabled:opacity-50"
+                    aria-label="天気を再取得"
+                  >
+                    <RefreshCw size={12} className={weatherLoading ? 'animate-spin' : ''} />
+                  </button>
+                </div>
+              )}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="w-11 h-11 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="設定"
+              >
+                <Settings size={18} className="text-stone-600" />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -85,16 +98,6 @@ export default function App() {
           threshold={threshold}
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           onSelectDate={setSelectedDate}
-        />
-
-        <WeatherCard
-          locationName={state.location?.name}
-          forecast={forecast}
-          threshold={threshold}
-          selectedDate={selectedDate}
-          weatherLoading={weatherLoading}
-          weatherError={weatherError}
-          onFetchWeather={actions.fetchWeather}
         />
 
         <BagSummary
