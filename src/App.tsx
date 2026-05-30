@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Settings, RefreshCw } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
@@ -172,6 +173,7 @@ export default function App() {
           {toast}
         </div>
       )}
+      <Analytics />
     </div>
   );
 }

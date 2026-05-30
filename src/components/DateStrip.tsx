@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Forecast } from '../types';
-import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
+import { jstDateOffset, jstWeekday, jstWeekdayNum, nextDaycareDay } from '../lib/date';
 import { iconFromLabel } from '../lib/icons';
 
 interface Props {
@@ -11,7 +11,8 @@ interface Props {
   onSelectDate: (date: string) => void;
 }
 
-const DATE_RANGE = Array.from({ length: 9 }, (_, i) => i - 1);
+const INITIAL_MAX = 30;
+const LOAD_MORE = 14;
 
 function relativeLabel(date: string): string {
   if (date === jstDateOffset(-1)) return '昨日';
@@ -61,21 +62,54 @@ function weatherIconClass(label: string | undefined): string {
 export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, onSelectDate }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [maxOffset, setMaxOffset] = useState(INITIAL_MAX);
+
+  // 末尾に近づいたら日付を追加
+  const loadMore = useCallback(() => setMaxOffset((prev) => prev + LOAD_MORE), []);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { root: scrollRef.current, rootMargin: '0px 200px 0px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [selectedDate]);
 
+  const dateRange = Array.from({ length: maxOffset + 2 }, (_, i) => i - 1); // -1 .. maxOffset
   const byDate = new Map((forecast?.days ?? []).map((d) => [d.date, d]));
+
+  const goToNextDaycareDay = () => {
+    const next = nextDaycareDay(closedWeekdays, 1);
+    onSelectDate(next);
+    // 再レンダー後に selectedRef が更新されてからスクロール
+    requestAnimationFrame(() => {
+      selectedRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
+  };
 
   return (
     <div className="px-5 pt-2 pb-3">
-      <div className="text-[15px] tracking-[0.3em] text-stone-400 font-bold mb-2 px-1">日付を選ぶ</div>
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="text-[15px] tracking-[0.3em] text-stone-400 font-bold">日付を選ぶ</div>
+        <button
+          onClick={goToNextDaycareDay}
+          className="text-[13px] font-bold text-stone-500 bg-white border border-stone-200 rounded-xl px-3 py-1 active:scale-95 transition-all"
+        >
+          次の登園日
+        </button>
+      </div>
       <div
         ref={scrollRef}
         className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 no-scrollbar snap-x"
       >
-        {DATE_RANGE.map((off) => {
+        {dateRange.map((off) => {
           const date = jstDateOffset(off);
           const rel = relativeLabel(date);
           const [, mm, dd] = date.split('-');
@@ -138,6 +172,8 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
             </button>
           );
         })}
+        {/* 末尾センチネル: 見えたら日付を追加 */}
+        <div ref={sentinelRef} className="shrink-0 w-1" />
       </div>
     </div>
   );
