@@ -58,13 +58,29 @@ export default function App() {
 
       <div className="relative max-w-lg mx-auto">
         {/* ヘッダー */}
-        <header className="px-5 pt-7 pb-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-[10px] tracking-[0.35em] text-stone-500 font-medium mb-1">
-                DAYCARE · PREP
+        <header className="px-5 pt-5 pb-3">
+          <div className="flex items-center justify-between">
+            {/* ロゴ */}
+            <div className="flex items-center gap-2">
+              <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
+                <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {/* ハンドル */}
+                  <path d="M38 22 Q38 12 50 12 Q62 12 62 22" stroke="#D4A017" strokeWidth="7" strokeLinecap="round" fill="none"/>
+                  {/* 本体 */}
+                  <rect x="14" y="24" width="72" height="54" rx="16" fill="#F5C518"/>
+                  {/* ポケット仕切り線 */}
+                  <path d="M14 56 Q50 62 86 56" stroke="#D4A017" strokeWidth="3.5" fill="none"/>
+                  {/* 服(青) */}
+                  <ellipse cx="40" cy="44" rx="12" ry="10" fill="#A8C4DC" opacity="0.9"/>
+                  {/* 服(緑) */}
+                  <ellipse cx="54" cy="46" rx="14" ry="11" fill="#A8D4A8" opacity="0.9"/>
+                  {/* サイドポケット左 */}
+                  <rect x="6" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+                  {/* サイドポケット右 */}
+                  <rect x="82" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+                </svg>
               </div>
-              <h1 className="text-3xl font-black text-stone-800 leading-tight">保育園準備</h1>
+              <span className="text-lg font-black text-stone-800 tracking-tight">hoikubag</span>
             </div>
             <div className="flex items-center gap-2">
               {state.location?.name && (
