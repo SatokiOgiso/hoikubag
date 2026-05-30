@@ -1,16 +1,33 @@
 import type { Forecast, DayForecast } from '../types';
+import { jstDateOffset } from './date';
 
 /**
- * 天気の自動取得(Open-Meteo)。
+ * 天気の自動取得(ハイブリッド)。
  *
- * GET https://api.open-meteo.com/v1/forecast
- *   ?latitude=..&longitude=..
- *   &daily=weather_code,temperature_2m_max,temperature_2m_min
- *   &timezone=Asia/Tokyo&past_days=1&forecast_days=2
+ * - 今日・明日: **気象庁**オープンデータ(精度重視)
+ *     GET https://www.jma.go.jp/bosai/forecast/data/forecast/{officeCode}.json
+ * - 昨日(過去): **Open-Meteo**(気象庁の予報APIは過去日を返さないため)
+ *     GET https://api.open-meteo.com/v1/forecast?...&past_days=1
  *
- * past_days=1 + forecast_days=2 で「昨日・今日・明日」の3日分が返る。
- * 無料・APIキー不要・CORS 許可済みでブラウザから直接取得できる。
+ * いずれも無料・APIキー不要・CORS 許可済みでブラウザから直接取得できる。
+ * 気象庁が取得できない場合は Open-Meteo で今日・明日を補完する。
  */
+
+// 都道府県名 → 気象庁 office コード(全47)
+const JMA_OFFICES: Record<string, string> = {
+  北海道: '016000', 青森県: '020000', 岩手県: '030000', 宮城県: '040000',
+  秋田県: '050000', 山形県: '060000', 福島県: '070000', 茨城県: '080000',
+  栃木県: '090000', 群馬県: '100000', 埼玉県: '110000', 千葉県: '120000',
+  東京都: '130000', 神奈川県: '140000', 新潟県: '150000', 富山県: '160000',
+  石川県: '170000', 福井県: '180000', 山梨県: '190000', 長野県: '200000',
+  岐阜県: '210000', 静岡県: '220000', 愛知県: '230000', 三重県: '240000',
+  滋賀県: '250000', 京都府: '260000', 大阪府: '270000', 兵庫県: '280000',
+  奈良県: '290000', 和歌山県: '300000', 鳥取県: '310000', 島根県: '320000',
+  岡山県: '330000', 広島県: '340000', 山口県: '350000', 徳島県: '360000',
+  香川県: '370000', 愛媛県: '380000', 高知県: '390000', 福岡県: '400000',
+  佐賀県: '410000', 長崎県: '420000', 熊本県: '430000', 大分県: '440000',
+  宮崎県: '450000', 鹿児島県: '460100', 沖縄県: '471000',
+};
 
 // 都道府県名 → 県庁所在地の緯度経度(全47)
 const PREF_COORDS: Record<string, [number, number]> = {
@@ -32,17 +49,94 @@ const PREF_COORDS: Record<string, [number, number]> = {
   鹿児島県: [31.56, 130.56], 沖縄県: [26.21, 127.68],
 };
 
-/** 地域名から緯度経度を解決(完全名で一致 or 含む) */
-export function resolveCoords(name: string): [number, number] | null {
+/** 完全名で一致 or 含む、で表から値を引く(京都/東京の誤マッチを回避) */
+function lookup<T>(table: Record<string, T>, name: string): T | null {
   if (!name) return null;
   const n = name.trim();
-  if (PREF_COORDS[n]) return PREF_COORDS[n];
-  // 「東京都新宿区」のように都道府県名を含む場合に対応(完全名で照合)
-  for (const key of Object.keys(PREF_COORDS)) {
-    if (n.includes(key)) return PREF_COORDS[key];
+  if (table[n]) return table[n];
+  for (const key of Object.keys(table)) {
+    if (n.includes(key)) return table[key];
   }
   return null;
 }
+
+export const resolveAreaCode = (name: string): string | null => lookup(JMA_OFFICES, name);
+export const resolveCoords = (name: string): [number, number] | null => lookup(PREF_COORDS, name);
+
+function toTemp(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === '') return null; // 気象庁の tempsMax/Min は "" のことがある(0と誤認しない)
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+const dateOf = (iso: unknown): string => String(iso).slice(0, 10);
+const hasData = (d: DayForecast | null): d is DayForecast =>
+  !!d && (d.high != null || d.low != null || !!d.label);
+
+// ---- 気象庁 ----
+
+/** 気象庁 forecast JSON から指定日(YYYY-MM-DD)の予報を取り出す */
+export function parseJmaDay(json: unknown, date: string): DayForecast {
+  const root = (Array.isArray(json) ? json : []) as any[];
+  const short = root[0];
+  const weekly = root[1];
+
+  let label = '';
+  let high: number | null = null;
+  let low: number | null = null;
+
+  // 天気テキスト: 短期予報 data[0].timeSeries[0]
+  const wts = short?.timeSeries?.[0];
+  if (Array.isArray(wts?.timeDefines)) {
+    const i = wts.timeDefines.findIndex((t: unknown) => dateOf(t) === date);
+    if (i >= 0) label = wts.areas?.[0]?.weathers?.[i] ?? '';
+  }
+
+  // 気温: 週間予報 data[1].timeSeries[1] を優先
+  const wtemp = weekly?.timeSeries?.[1];
+  if (Array.isArray(wtemp?.timeDefines)) {
+    const i = wtemp.timeDefines.findIndex((t: unknown) => dateOf(t) === date);
+    if (i >= 0) {
+      const a = wtemp.areas?.[0];
+      high = toTemp(a?.tempsMax?.[i]);
+      low = toTemp(a?.tempsMin?.[i]);
+    }
+  }
+
+  // フォールバック: 短期予報の気温 data[0].timeSeries[2]
+  if (high == null && low == null) {
+    const stemp = short?.timeSeries?.[2];
+    if (Array.isArray(stemp?.timeDefines)) {
+      const a = stemp.areas?.[0];
+      let mn: number | null = null;
+      let mx: number | null = null;
+      stemp.timeDefines.forEach((t: unknown, idx: number) => {
+        if (dateOf(t) !== date) return;
+        const v = toTemp(a?.temps?.[idx]);
+        if (v == null) return;
+        mn = mn == null ? v : Math.min(mn, v);
+        mx = mx == null ? v : Math.max(mx, v);
+      });
+      low = mn;
+      high = mx;
+    }
+  }
+
+  label = label.replace(/　/g, ' ').replace(/\s+/g, ' ').trim();
+  return { date, high, low, label };
+}
+
+async function fetchJmaJson(name: string): Promise<unknown> {
+  const code = resolveAreaCode(name);
+  if (!code) throw new Error('気象庁エリアを特定できませんでした');
+  const r = await fetch(`https://www.jma.go.jp/bosai/forecast/data/forecast/${code}.json`);
+  if (!r.ok) throw new Error(`気象庁API応答エラー (HTTP ${r.status})`);
+  return r.json();
+}
+
+// ---- Open-Meteo ----
 
 /** WMO weather code を日本語ラベルへ(アイコン判定 icons.ts と整合) */
 export function wmoToLabel(code: number | null | undefined): string {
@@ -61,13 +155,7 @@ export function wmoToLabel(code: number | null | undefined): string {
   return 'くもり';
 }
 
-function toTemp(v: unknown): number | null {
-  if (v == null) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? Math.round(n) : null;
-}
-
-/** Open-Meteo の daily レスポンスを Forecast へ変換 */
+/** Open-Meteo の daily レスポンスを DayForecast[] へ変換 */
 export function parseOpenMeteo(json: unknown): DayForecast[] {
   const daily = (json as any)?.daily;
   const times: unknown[] = Array.isArray(daily?.time) ? daily.time : [];
@@ -76,32 +164,73 @@ export function parseOpenMeteo(json: unknown): DayForecast[] {
   const mins: unknown[] = Array.isArray(daily?.temperature_2m_min) ? daily.temperature_2m_min : [];
 
   return times.map((t, i) => ({
-    date: String(t).slice(0, 10),
+    date: dateOf(t),
     high: toTemp(maxes[i]),
     low: toTemp(mins[i]),
     label: wmoToLabel(codes[i] == null ? null : Number(codes[i])),
   }));
 }
 
-/** 昨日・今日・明日の天気を Open-Meteo から取得 */
-export async function fetchForecast(locationName: string): Promise<Forecast> {
-  const coords = resolveCoords(locationName);
-  if (!coords) {
-    throw new Error('地域から座標を特定できませんでした(都道府県名で設定してください)');
-  }
+async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
+  const coords = resolveCoords(name);
+  if (!coords) throw new Error('座標を特定できませんでした');
   const [lat, lon] = coords;
+  // past_days=1 + forecast_days=2 で 昨日・今日・明日(フォールバック用)を取得
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
     `&timezone=Asia%2FTokyo&past_days=1&forecast_days=2`;
-
   const r = await fetch(url);
-  if (!r.ok) {
-    throw new Error(`天気API応答エラー (HTTP ${r.status})`);
+  if (!r.ok) throw new Error(`Open-Meteo応答エラー (HTTP ${r.status})`);
+  return parseOpenMeteo(await r.json());
+}
+
+// ---- 統合 ----
+
+/**
+ * 昨日(Open-Meteo)+ 今日・明日(気象庁)の3日分を取得。
+ * 気象庁が失敗した日は Open-Meteo で補完する。
+ */
+export async function fetchForecast(locationName: string): Promise<Forecast> {
+  const yId = jstDateOffset(-1);
+  const tId = jstDateOffset(0);
+  const mId = jstDateOffset(1);
+
+  const [jmaRes, omRes] = await Promise.allSettled([
+    fetchJmaJson(locationName),
+    fetchOpenMeteoDays(locationName),
+  ]);
+
+  const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
+  const omOf = (date: string) => omDays.find((d) => d.date === date) ?? null;
+
+  let today: DayForecast | null = null;
+  let tomorrow: DayForecast | null = null;
+  if (jmaRes.status === 'fulfilled') {
+    today = parseJmaDay(jmaRes.value, tId);
+    tomorrow = parseJmaDay(jmaRes.value, mId);
   }
-  const days = parseOpenMeteo(await r.json());
+
+  // 今日・明日が気象庁で取れたか(取れなければ Open-Meteo で補完)
+  const jmaTomorrow = hasData(tomorrow);
+  if (!hasData(today)) today = omOf(tId);
+  if (!hasData(tomorrow)) tomorrow = omOf(mId);
+
+  // 昨日は常に Open-Meteo
+  const yesterday = omOf(yId);
+
+  const days = [yesterday, today, tomorrow].filter(hasData);
   if (days.length === 0) {
-    throw new Error('予報データが取得できませんでした');
+    const reasons = [jmaRes, omRes]
+      .filter((r) => r.status === 'rejected')
+      .map((r) => (r as PromiseRejectedResult).reason?.message)
+      .join(' / ');
+    throw new Error(reasons || '予報データが取得できませんでした');
   }
-  return { days, source: 'open-meteo', fetchedAt: Date.now() };
+
+  return {
+    days,
+    source: jmaTomorrow ? 'jma' : 'open-meteo',
+    fetchedAt: Date.now(),
+  };
 }

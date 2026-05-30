@@ -12,8 +12,8 @@ interface Props {
   onFetchWeather: () => void;
 }
 
-const SOURCE_LABEL: Record<string, string> = {
-  jma: '気象庁',
+const SOURCE_NOTE: Record<string, string> = {
+  jma: '今日・明日: 気象庁 / 昨日: Open-Meteo',
   'open-meteo': 'Open-Meteo',
 };
 
@@ -30,6 +30,35 @@ function relativeLabel(date: string): string {
   if (date === jstDateOffset(1)) return '明日';
   return '';
 }
+
+// 気温→色のアンカー(15:緑 → 25:赤オレンジ → 30:赤 → 35:紫)
+const TEMP_STOPS: { t: number; c: [number, number, number] }[] = [
+  { t: 15, c: [22, 163, 74] }, // 緑
+  { t: 25, c: [234, 88, 12] }, // 赤オレンジ
+  { t: 30, c: [220, 38, 38] }, // 赤
+  { t: 35, c: [147, 51, 234] }, // 紫
+];
+
+/** 気温に応じた文字色(アンカー間は線形補間、範囲外はクランプ) */
+function tempColor(t: number | null): string {
+  if (t == null) return '#A8A29E'; // stone-400
+  const first = TEMP_STOPS[0];
+  const last = TEMP_STOPS[TEMP_STOPS.length - 1];
+  if (t <= first.t) return `rgb(${first.c.join(',')})`;
+  if (t >= last.t) return `rgb(${last.c.join(',')})`;
+  for (let i = 0; i < TEMP_STOPS.length - 1; i++) {
+    const a = TEMP_STOPS[i];
+    const b = TEMP_STOPS[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const r = (t - a.t) / (b.t - a.t);
+      const mix = a.c.map((ac, j) => Math.round(ac + (b.c[j] - ac) * r));
+      return `rgb(${mix.join(',')})`;
+    }
+  }
+  return '#A8A29E';
+}
+
+const fmtTemp = (t: number | null): string => (t != null ? `${t}°` : '—');
 
 function DayCell({ day, threshold }: { day: DayForecast; threshold: number }) {
   const rel = relativeLabel(day.date);
@@ -64,14 +93,20 @@ function DayCell({ day, threshold }: { day: DayForecast; threshold: number }) {
           className={hot ? 'text-orange-500' : cool ? 'text-sky-600' : 'text-stone-500'}
         />
       </div>
-      <div className="text-[11px] text-stone-500 truncate" title={day.label}>
+      <div className="text-[11px] text-stone-500 truncate mb-1.5" title={day.label}>
         {day.label || '—'}
       </div>
-      <div className="mt-1 font-black text-stone-800">
-        {day.high != null ? `${day.high}°` : '—'}
-      </div>
-      <div className="text-xs text-stone-400 font-bold">
-        {day.low != null ? `${day.low}°` : '—'}
+
+      {/* 最低 / 最高(大きく・気温に応じた色) */}
+      <div className="text-[9px] text-stone-400 font-bold tracking-wide">最低 / 最高</div>
+      <div className="flex items-baseline justify-center gap-1 font-black leading-none">
+        <span className={isTomorrow ? 'text-3xl' : 'text-2xl'} style={{ color: tempColor(day.low) }}>
+          {fmtTemp(day.low)}
+        </span>
+        <span className="text-stone-300 text-base">/</span>
+        <span className={isTomorrow ? 'text-3xl' : 'text-2xl'} style={{ color: tempColor(day.high) }}>
+          {fmtTemp(day.high)}
+        </span>
       </div>
     </div>
   );
@@ -95,7 +130,7 @@ export default function WeatherCard({
   const tHigh = tomorrow?.high ?? null;
   const isHot = tHigh != null && tHigh > threshold;
   const isCool = tHigh != null && tHigh <= threshold;
-  const sourceLabel = forecast ? (SOURCE_LABEL[forecast.source] ?? '') : '';
+  const sourceNote = forecast ? (SOURCE_NOTE[forecast.source] ?? '') : '';
 
   return (
     <div className="px-5 mb-5">
@@ -141,8 +176,8 @@ export default function WeatherCard({
                   明日の気温が取得できませんでした(しきい値 {threshold}°C)
                 </div>
               )}
-              {sourceLabel && (
-                <div className="text-[10px] text-stone-400 mt-1">天気: {sourceLabel}</div>
+              {sourceNote && (
+                <div className="text-[10px] text-stone-400 mt-1">天気: {sourceNote}</div>
               )}
             </div>
           </>
