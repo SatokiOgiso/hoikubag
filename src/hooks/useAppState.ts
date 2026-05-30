@@ -7,8 +7,12 @@ import {
   setStoredFamilyId,
   clearStoredFamilyId,
   generateFamilyId,
+  loadLocalCache,
+  KvStorageProvider,
   type StorageProvider,
 } from '../lib/storage';
+
+export type SyncStatus = 'local' | 'ok' | 'error';
 import { uid } from '../lib/date';
 
 function initialState(): AppState {
@@ -29,10 +33,21 @@ export function useAppState() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
+  const [syncError, setSyncError] = useState<string | null>(null);
   // 競合解決用に最新の updatedAt を ref で保持(リスナーの再登録を避ける)
   const updatedAtRef = useRef(0);
   // 現在の永続化 Provider(共有の有無で差し替わる)
   const providerRef = useRef<StorageProvider>(createProvider(null));
+
+  const markSynced = () => {
+    setSyncStatus('ok');
+    setSyncError(null);
+  };
+  const markSyncError = (e: unknown) => {
+    setSyncStatus('error');
+    setSyncError(e instanceof Error ? e.message : String(e));
+  };
 
   // 初回ロード(familyId があればクラウドから取得)
   useEffect(() => {
@@ -40,8 +55,16 @@ export function useAppState() {
     (async () => {
       const fid = getStoredFamilyId();
       providerRef.current = createProvider(fid);
-      const loaded = await providerRef.current.load();
-      const next = loaded ?? initialState();
+      let next: AppState;
+      try {
+        const loaded = await providerRef.current.load();
+        next = loaded ?? initialState();
+        if (fid) markSynced();
+      } catch (e) {
+        // クラウド取得に失敗 → ローカルキャッシュで起動しつつエラーを記録
+        next = loadLocalCache() ?? initialState();
+        if (fid) markSyncError(e);
+      }
       if (!active) return;
       updatedAtRef.current = next.updatedAt;
       setFamilyId(fid);
@@ -53,12 +76,20 @@ export function useAppState() {
     };
   }, []);
 
-  // 保存(updatedAt を更新 → Provider へ)
+  // 保存(updatedAt を更新 → Provider へ)。共有中は同期成否を syncStatus に反映
   const save = useCallback((next: AppState) => {
     const stamped = { ...next, updatedAt: Date.now() };
     updatedAtRef.current = stamped.updatedAt;
     setState(stamped);
-    void providerRef.current.save(stamped);
+    const cloud = providerRef.current instanceof KvStorageProvider;
+    providerRef.current
+      .save(stamped)
+      .then(() => {
+        if (cloud) markSynced();
+      })
+      .catch((e) => {
+        if (cloud) markSyncError(e);
+      });
   }, []);
 
   // 画面復帰時に再読込(共有中はクラウドの最新を取り込む)
@@ -66,12 +97,18 @@ export function useAppState() {
     if (loading) return;
     const onVisible = async () => {
       if (document.hidden) return;
-      const remote = await providerRef.current.load();
-      if (!remote) return;
-      // 新しい方を採用(last-write-wins)
-      if (remote.updatedAt > updatedAtRef.current) {
-        updatedAtRef.current = remote.updatedAt;
-        setState(remote);
+      const cloud = providerRef.current instanceof KvStorageProvider;
+      try {
+        const remote = await providerRef.current.load();
+        if (cloud) markSynced();
+        if (!remote) return;
+        // 新しい方を採用(last-write-wins)
+        if (remote.updatedAt > updatedAtRef.current) {
+          updatedAtRef.current = remote.updatedAt;
+          setState(remote);
+        }
+      } catch (e) {
+        if (cloud) markSyncError(e);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -370,18 +407,27 @@ export function useAppState() {
     clearStoredFamilyId();
     providerRef.current = createProvider(null);
     setFamilyId(null);
+    setSyncStatus('local');
+    setSyncError(null);
     showToast('この端末の共有を停止しました');
   }, [showToast]);
 
   /** 今すぐクラウドの最新を取得 */
   const syncNow = useCallback(async () => {
-    const remote = await providerRef.current.load();
-    if (remote && remote.updatedAt > updatedAtRef.current) {
-      updatedAtRef.current = remote.updatedAt;
-      setState(remote);
-      showToast('最新データに更新しました');
-    } else {
-      showToast('すでに最新です');
+    const cloud = providerRef.current instanceof KvStorageProvider;
+    try {
+      const remote = await providerRef.current.load();
+      if (cloud) markSynced();
+      if (remote && remote.updatedAt > updatedAtRef.current) {
+        updatedAtRef.current = remote.updatedAt;
+        setState(remote);
+        showToast('最新データに更新しました');
+      } else {
+        showToast('すでに最新です');
+      }
+    } catch (e) {
+      if (cloud) markSyncError(e);
+      showToast('同期に失敗しました');
     }
   }, [showToast]);
 
@@ -391,6 +437,8 @@ export function useAppState() {
     toast,
     showToast,
     familyId,
+    syncStatus,
+    syncError,
     actions: {
       changeItem,
       changeDefault,

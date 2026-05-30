@@ -58,6 +58,11 @@ function writeLocal(state: AppState): void {
   }
 }
 
+/** localStorage キャッシュの読み出し(クラウド失敗時のフォールバック用に公開) */
+export function loadLocalCache(): AppState | null {
+  return readLocal();
+}
+
 export class LocalStorageProvider implements StorageProvider {
   async load(): Promise<AppState | null> {
     return readLocal();
@@ -67,7 +72,11 @@ export class LocalStorageProvider implements StorageProvider {
   }
 }
 
-/** 家族共有: /api/state 経由でクラウドに読み書きしつつ localStorage にキャッシュ */
+/**
+ * 家族共有: /api/state 経由でクラウドに読み書きしつつ localStorage にキャッシュ。
+ * クラウド側の失敗(サーバー未設定・ネットワーク不通など)は **握りつぶさず throw** し、
+ * 呼び出し側(useAppState)が同期エラーとしてユーザーに通知できるようにする。
+ */
 export class KvStorageProvider implements StorageProvider {
   constructor(private familyId: string) {}
 
@@ -76,31 +85,24 @@ export class KvStorageProvider implements StorageProvider {
   }
 
   async load(): Promise<AppState | null> {
-    try {
-      const r = await fetch(this.url());
-      if (r.ok) {
-        const state = migrate(await r.json());
-        if (state) {
-          writeLocal(state); // キャッシュ更新
-          return state;
-        }
-      }
-    } catch {
-      // ネットワーク不通時は下のローカルキャッシュにフォールバック
+    const r = await fetch(this.url());
+    if (!r.ok) {
+      throw new Error(`サーバー応答エラー (HTTP ${r.status})`);
     }
-    return readLocal();
+    const state = migrate(await r.json());
+    if (state) writeLocal(state); // キャッシュ更新
+    return state; // クラウドが空なら null
   }
 
   async save(state: AppState): Promise<void> {
-    writeLocal(state); // 即時キャッシュ
-    try {
-      await fetch(this.url(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
-      });
-    } catch {
-      // オフライン時はローカルキャッシュのみ。次回の load/save で再同期される
+    writeLocal(state); // 即時キャッシュ(オフライン時もローカルには残る)
+    const r = await fetch(this.url(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    });
+    if (!r.ok) {
+      throw new Error(`サーバー応答エラー (HTTP ${r.status})`);
     }
   }
 }

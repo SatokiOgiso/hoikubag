@@ -77,6 +77,20 @@ Vercel の **Marketplace → Upstash** 連携を追加すると、以下が自�
 (Upstash 既定の `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` も可。)
 未設定でもアプリは起動し、共有を有効にしない限り localStorage のみで動作する。
 
+> **重要:** この環境変数が未設定のまま「共有を開始」しても、`/api/state` が
+> エラーを返し、データは端末内に留まる(家族間で同期されない)。その場合、設定の
+> 「家族とのデータ同期」に **⚠️ クラウドに接続できていません** と表示される。
+> Upstash を連携し、変数設定後に **再デプロイ**すると解消する。
+
+### Upstash セットアップ手順(無料)
+
+1. Vercel のプロジェクト → **Storage**(または Integrations / Marketplace)→ **Upstash for Redis** を追加。
+2. データベースをこのプロジェクトに **Connect** する。`KV_REST_API_URL` /
+   `KV_REST_API_TOKEN` が自動で環境変数に追加される。
+3. **Deployments → 最新を Redeploy**(環境変数は再デプロイで反映される)。
+4. アプリの設定で「家族と共有を開始」→ **クラウドと同期できています** と表示されれば成功。
+   共有リンクを家族に送る。
+
 ローカルで `/api` を含めて動かすには `vercel dev`(環境変数を読み込む)を使う。
 通常の `npm run dev` では `/api` は配信されず、共有有効時もローカルキャッシュで動作する。
 

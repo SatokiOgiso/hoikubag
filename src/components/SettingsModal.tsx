@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users } from 'lucide-react';
+import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle } from 'lucide-react';
 import type { AppState, Item } from '../types';
+import type { SyncStatus } from '../hooks/useAppState';
 import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, ITEM_EMOJI_CHOICES } from '../constants';
 import { shareUrlFor } from '../lib/storage';
 
@@ -8,6 +9,8 @@ interface Props {
   state: AppState;
   items: Item[];
   familyId: string | null;
+  syncStatus: SyncStatus;
+  syncError: string | null;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -28,7 +31,15 @@ interface Props {
 }
 
 /** 設定モーダル(下から立ち上がる/デスクトップは中央) */
-export default function SettingsModal({ state, items, familyId, onClose, actions }: Props) {
+export default function SettingsModal({
+  state,
+  items,
+  familyId,
+  syncStatus,
+  syncError,
+  onClose,
+  actions,
+}: Props) {
   const [citySearch, setCitySearch] = useState('');
   const [copied, setCopied] = useState(false);
   const [newItemName, setNewItemName] = useState('');
@@ -382,6 +393,29 @@ export default function SettingsModal({ state, items, familyId, onClose, actions
                     データが表示・編集できます。
                   </p>
                 </div>
+
+                {/* クラウド同期の状態 */}
+                {syncStatus === 'error' ? (
+                  <div className="bg-red-50 rounded-xl p-3 border border-red-200 text-xs text-red-700 leading-relaxed space-y-1">
+                    <p className="flex items-center gap-1.5 font-bold">
+                      <AlertTriangle size={14} /> クラウドに接続できていません
+                    </p>
+                    <p className="text-red-600">
+                      現在この端末のデータは家族と同期されていません。サーバー
+                      (Upstash) が未設定の可能性があります。Vercel の環境変数
+                      <span className="font-mono">KV_REST_API_URL</span> /
+                      <span className="font-mono"> KV_REST_API_TOKEN</span>
+                      を設定して再デプロイしてください。
+                    </p>
+                    {syncError && (
+                      <p className="text-[10px] text-red-400 break-all">詳細: {syncError}</p>
+                    )}
+                  </div>
+                ) : syncStatus === 'ok' ? (
+                  <div className="bg-emerald-50 rounded-xl px-3 py-2 border border-emerald-200 text-xs text-emerald-700 font-bold flex items-center gap-1.5">
+                    <Check size={14} /> クラウドと同期できています
+                  </div>
+                ) : null}
 
                 {/* 共有リンク + コピー */}
                 <div className="flex gap-2">
