@@ -40,6 +40,7 @@ export function migrate(raw: unknown): AppState | null {
       name: c.name,
       bags,
       defaults: c.defaults || {},
+      recurringItems: Array.isArray(c.recurringItems) ? c.recurringItems : undefined,
     };
   });
 

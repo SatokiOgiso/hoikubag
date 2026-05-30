@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X } from 'lucide-react';
 import type { Child, Item } from '../types';
-import { getBag } from '../types';
 import { ACCENT } from '../constants';
 import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
+import { effectiveItems, recurringKeys } from '../lib/recurring';
 
 interface Props {
   child: Child;
@@ -12,7 +12,7 @@ interface Props {
   isHot: boolean;
   isCool: boolean;
   closedWeekdays: number[];
-  onChangeItem: (date: string, key: string, delta: number) => void;
+  onChangeItem: (date: string, key: string, delta: number, base?: number) => void;
   onReset: (date: string, id: string) => void;
   onToggleConfirm: (date: string) => void;
   onCopyBag: (childId: string, fromDate: string, toDates: string[]) => void;
@@ -41,14 +41,14 @@ export default function ItemList({
   const [showCopy, setShowCopy] = useState(false);
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
 
-  const bag = getBag(child, date);
-  const items = bag.items;
-  const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
-  const confirmed = !!bag.confirmed;
+  const effectiveCounts = effectiveItems(child, date);
+  const recKeys = recurringKeys(child, date);
+  const totalCount = Object.values(effectiveCounts).reduce((a, b) => a + b, 0);
+  const confirmed = !!(child.bags?.[date]?.confirmed);
 
-  const [localNotes, setLocalNotes] = useState<string[]>(() => bag.notes ?? []);
+  const [localNotes, setLocalNotes] = useState<string[]>(() => child.bags?.[date]?.notes ?? []);
   useEffect(() => {
-    setLocalNotes(bag.notes ?? []);
+    setLocalNotes(child.bags?.[date]?.notes ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, child.id]);
 
@@ -106,7 +106,8 @@ export default function ItemList({
       <div className="space-y-2">
         {/* 通常アイテム */}
         {itemDefs.map((item) => {
-          const count = items[item.key] || 0;
+          const count = effectiveCounts[item.key] || 0;
+          const isRecurring = recKeys.has(item.key);
           const warn =
             (item.sleeve === 'long' && isHot && count > 0) ||
             (item.sleeve === 'short' && isCool && count > 0);
@@ -153,10 +154,13 @@ export default function ItemList({
                       {isHot ? '暑い予報です' : '涼しい予報です'}
                     </div>
                   )}
+                  {!confirmed && isRecurring && count > 0 && (
+                    <div className="text-[10px] text-stone-400 mt-0.5 font-medium">🔁 定期</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => onChangeItem(date, item.key, -1)}
+                    onClick={() => onChangeItem(date, item.key, -1, count)}
                     disabled={confirmed || count === 0}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
                       confirmed || count === 0
@@ -175,7 +179,7 @@ export default function ItemList({
                     {count}
                   </div>
                   <button
-                    onClick={() => onChangeItem(date, item.key, 1)}
+                    onClick={() => onChangeItem(date, item.key, 1, count)}
                     disabled={confirmed}
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all disabled:opacity-30"
                     style={{ background: ACCENT }}
