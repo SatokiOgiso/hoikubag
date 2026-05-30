@@ -19,6 +19,13 @@ import { fetchForecast } from '../lib/weather';
 
 export type SyncStatus = 'local' | 'ok' | 'error';
 
+/** トースト。undo があれば「元に戻す」ボタンを表示する */
+export interface ToastState {
+  id: number;
+  message: string;
+  undo?: () => void;
+}
+
 function initialState(): AppState {
   const firstChild: Child = { id: uid(), name: '子ども1', bags: {}, defaults: {} };
   return {
@@ -35,7 +42,7 @@ function initialState(): AppState {
 export function useAppState() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
   // 選択中の日付(YYYY-MM-DD)。既定は明日。揮発(同期しない)
   const [selectedDate, setSelectedDate] = useState<string>(() => jstDateOffset(1));
@@ -139,10 +146,26 @@ export function useAppState() {
     stateRef.current = state;
   }, [state]);
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2000);
+  // 表示中トーストの自動消去タイマー(新しいトーストが来たら前のを止める)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((msg: string, undo?: () => void) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    const id = Date.now();
+    setToast({ id, message: msg, undo });
+    // 「元に戻す」付きは押す猶予を長めに
+    toastTimer.current = setTimeout(() => {
+      setToast((t) => (t && t.id === id ? null : t));
+    }, undo ? 6000 : 2000);
   }, []);
+
+  /** 直前のスナップショットへ復元する「元に戻す」を作る */
+  const makeUndo = useCallback(
+    (snapshot: AppState) => () => {
+      save(snapshot);
+      showToast('元に戻しました');
+    },
+    [save, showToast]
+  );
 
   // ---- 現在の子どもの items / defaults を編集するヘルパー ----
   const mapCurrentChild = useCallback(
@@ -240,8 +263,10 @@ export function useAppState() {
   /** 指定日のかばんの内容をデフォルトとして保存 */
   const saveCurrentAsDefault = useCallback(
     (date: string) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
+        prev = s;
         const next = mapCurrentChild(s, (c) => ({
           ...c,
           defaults: { ...(c.bags?.[date]?.items ?? {}) },
@@ -249,9 +274,9 @@ export function useAppState() {
         save(next);
         return next;
       });
-      showToast('現在の入力をデフォルトに保存しました');
+      if (prev) showToast('現在の入力をデフォルトに保存しました', makeUndo(prev));
     },
-    [mapCurrentChild, save, showToast]
+    [mapCurrentChild, save, showToast, makeUndo]
   );
 
   const addChild = useCallback(() => {
@@ -286,12 +311,16 @@ export function useAppState() {
 
   const removeChild = useCallback(
     (id: string) => {
+      let prev: AppState | null = null;
+      let removedName = '';
       setState((s) => {
         if (!s) return s;
         if (s.children.length <= 1) {
           showToast('最低1人は必要です');
           return s;
         }
+        prev = s;
+        removedName = s.children.find((c) => c.id === id)?.name ?? '';
         const remaining = s.children.filter((c) => c.id !== id);
         const next = {
           ...s,
@@ -301,8 +330,9 @@ export function useAppState() {
         save(next);
         return next;
       });
+      if (prev) showToast(`「${removedName}」を削除しました`, makeUndo(prev));
     },
-    [save, showToast]
+    [save, showToast, makeUndo]
   );
 
   const selectChild = useCallback(
@@ -317,8 +347,10 @@ export function useAppState() {
   /** 指定日の指定子どものかばんをデフォルトに戻す */
   const resetChild = useCallback(
     (date: string, id: string) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
+        prev = s;
         const next = {
           ...s,
           children: s.children.map((c) =>
@@ -330,16 +362,18 @@ export function useAppState() {
         save(next);
         return next;
       });
-      showToast('デフォルトに戻しました');
+      if (prev) showToast('デフォルトに戻しました', makeUndo(prev));
     },
-    [save, showToast]
+    [save, showToast, makeUndo]
   );
 
   /** 指定日の全員のかばんをデフォルトに戻す */
   const resetAll = useCallback(
     (date: string) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
+        prev = s;
         const next = {
           ...s,
           children: s.children.map((c) => ({
@@ -350,9 +384,9 @@ export function useAppState() {
         save(next);
         return next;
       });
-      showToast('全員デフォルトに戻しました');
+      if (prev) showToast('全員デフォルトに戻しました', makeUndo(prev));
     },
-    [save, showToast]
+    [save, showToast, makeUndo]
   );
 
   const setLocation = useCallback(
@@ -393,10 +427,12 @@ export function useAppState() {
 
   const copyBag = useCallback(
     (childId: string, fromDate: string, toDates: string[]) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
         const child = s.children.find((c) => c.id === childId);
         if (!child) return s;
+        prev = s;
         const fromItems = child.bags?.[fromDate]?.items ?? {};
         const next: AppState = {
           ...s,
@@ -416,9 +452,9 @@ export function useAppState() {
         toDates.length === 1
           ? toDates[0].slice(5).replace('-', '/') + 'にコピーしました'
           : `${toDates.length}日にコピーしました`;
-      showToast(label);
+      if (prev) showToast(label, makeUndo(prev));
     },
-    [save, showToast]
+    [save, showToast, makeUndo]
   );
 
   const setClosedWeekdays = useCallback(
@@ -497,8 +533,10 @@ export function useAppState() {
   /** 追加した品目を削除(全員の items / defaults からも取り除く) */
   const removeCustomItem = useCallback(
     (key: string) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
+        prev = s;
         const strip = (rec: Record<string, number>) => {
           if (!(key in rec)) return rec;
           const copy = { ...rec };
@@ -520,8 +558,9 @@ export function useAppState() {
         save(next);
         return next;
       });
+      if (prev) showToast(`「${key}」を削除しました`, makeUndo(prev));
     },
-    [save]
+    [save, showToast, makeUndo]
   );
 
   // ---- 定期的な持ち物 ----
@@ -578,8 +617,10 @@ export function useAppState() {
 
   const removeRecurringItem = useCallback(
     (childId: string, ruleId: string) => {
+      let prev: AppState | null = null;
       setState((s) => {
         if (!s) return s;
+        prev = s;
         const next: AppState = {
           ...s,
           children: s.children.map((c) =>
@@ -591,8 +632,9 @@ export function useAppState() {
         save(next);
         return next;
       });
+      if (prev) showToast('定期的な持ち物を削除しました', makeUndo(prev));
     },
-    [save]
+    [save, showToast, makeUndo]
   );
 
   // ---- 家族共有 ----
