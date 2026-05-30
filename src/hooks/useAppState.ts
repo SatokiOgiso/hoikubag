@@ -12,8 +12,9 @@ import {
   type StorageProvider,
 } from '../lib/storage';
 
+import type { Forecast } from '../types';
 import { uid } from '../lib/date';
-import { fetchWeather as fetchWeatherApi } from '../lib/weather';
+import { fetchForecast } from '../lib/weather';
 
 export type SyncStatus = 'local' | 'ok' | 'error';
 
@@ -23,7 +24,6 @@ function initialState(): AppState {
     children: [firstChild],
     currentChildId: firstChild.id,
     location: { name: '東京都' },
-    weather: null,
     thresholdTemp: DEFAULT_THRESHOLD,
     customItems: [],
     updatedAt: 0,
@@ -37,6 +37,8 @@ export function useAppState() {
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [syncError, setSyncError] = useState<string | null>(null);
+  // 天気は同期せずデバイスごとにアクセスのたび取得(揮発)
+  const [forecast, setForecast] = useState<Forecast | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   // 競合解決用に最新の updatedAt を ref で保持(リスナーの再登録を避ける)
@@ -308,60 +310,29 @@ export function useAppState() {
     [save]
   );
 
-  const setManualWeather = useCallback(
-    (high: string, low: string, label: string) => {
-      const h = high === '' ? null : Number(high);
-      const l = low === '' ? null : Number(low);
-      setState((s) => {
-        if (!s) return s;
-        const next: AppState = {
-          ...s,
-          weather: {
-            high: h == null || !Number.isFinite(h) ? null : Math.round(h),
-            low: l == null || !Number.isFinite(l) ? null : Math.round(l),
-            label: label || '',
-            source: 'manual',
-            fetchedAt: Date.now(),
-          },
-        };
-        save(next);
-        return next;
-      });
-    },
-    [save]
-  );
-
-  const clearWeather = useCallback(() => {
-    setState((s) => {
-      if (!s) return s;
-      const next = { ...s, weather: null };
-      save(next);
-      return next;
-    });
-  }, [save]);
-
-  /** 気象庁から明日の天気を取得して保存 */
-  const fetchWeather = useCallback(async () => {
-    const name = stateRef.current?.location?.name;
-    if (!name) {
+  /** 天気を取得(同期せずローカル state にのみ反映) */
+  const fetchWeather = useCallback(async (name?: string) => {
+    const loc = name ?? stateRef.current?.location?.name;
+    if (!loc) {
       setWeatherError('地域が設定されていません');
       return;
     }
     setWeatherLoading(true);
     setWeatherError(null);
     try {
-      const weather = await fetchWeatherApi(name);
-      setState((s) => {
-        if (!s) return s;
-        const next = { ...s, weather };
-        save(next);
-        return next;
-      });
+      setForecast(await fetchForecast(loc));
     } catch (e) {
       setWeatherError(e instanceof Error ? e.message : String(e));
     }
     setWeatherLoading(false);
-  }, [save]);
+  }, []);
+
+  // アクセス毎(マウント後)+ 地域変更時に自動取得
+  const locationName = state?.location?.name;
+  useEffect(() => {
+    if (loading || !locationName) return;
+    void fetchWeather(locationName);
+  }, [loading, locationName, fetchWeather]);
 
   // ---- 品目のカスタマイズ ----
 
@@ -473,6 +444,7 @@ export function useAppState() {
     familyId,
     syncStatus,
     syncError,
+    forecast,
     weatherLoading,
     weatherError,
     actions: {
@@ -487,8 +459,6 @@ export function useAppState() {
       resetAll,
       setLocation,
       setThreshold,
-      setManualWeather,
-      clearWeather,
       fetchWeather,
       addCustomItem,
       removeCustomItem,

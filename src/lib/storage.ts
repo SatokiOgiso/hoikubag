@@ -33,7 +33,6 @@ export function migrate(raw: unknown): AppState | null {
     children,
     currentChildId: data.currentChildId || children[0]?.id || '',
     location: data.location?.name ? data.location : { name: '東京都' },
-    weather: data.weather ?? null,
     thresholdTemp: data.thresholdTemp ?? 23,
     customItems: Array.isArray(data.customItems) ? data.customItems : [],
     updatedAt: data.updatedAt || 0,

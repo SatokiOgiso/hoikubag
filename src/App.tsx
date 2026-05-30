@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
 import { DEFAULT_THRESHOLD, ITEMS } from './constants';
+import { jstDateOffset } from './lib/date';
 import { useAppState } from './hooks/useAppState';
 import BagSummary from './components/BagSummary';
 import WeatherCard from './components/WeatherCard';
@@ -9,8 +10,18 @@ import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
 export default function App() {
-  const { state, loading, toast, familyId, syncStatus, syncError, weatherLoading, weatherError, actions } =
-    useAppState();
+  const {
+    state,
+    loading,
+    toast,
+    familyId,
+    syncStatus,
+    syncError,
+    forecast,
+    weatherLoading,
+    weatherError,
+    actions,
+  } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
 
   if (loading || !state) {
@@ -24,7 +35,10 @@ export default function App() {
   const currentChild =
     state.children.find((c) => c.id === state.currentChildId) || state.children[0];
 
-  const tempHigh = state.weather?.high;
+  // 明日の最高気温で袖の警告を判定
+  const tomorrowDate = jstDateOffset(1);
+  const tomorrowForecast = forecast?.days.find((d) => d.date === tomorrowDate) ?? null;
+  const tempHigh = tomorrowForecast?.high ?? null;
   const threshold = state.thresholdTemp ?? DEFAULT_THRESHOLD;
   const hasTemp = tempHigh != null;
   const isHot = hasTemp && tempHigh > threshold;
@@ -67,12 +81,12 @@ export default function App() {
         <BagSummary state={state} items={allItems} onSelectChild={actions.selectChild} />
 
         <WeatherCard
-          state={state}
+          locationName={state.location?.name}
+          forecast={forecast}
+          threshold={threshold}
           weatherLoading={weatherLoading}
           weatherError={weatherError}
           onFetchWeather={actions.fetchWeather}
-          onSetManualWeather={actions.setManualWeather}
-          onClearWeather={actions.clearWeather}
         />
 
         <ChildTabs

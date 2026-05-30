@@ -12,12 +12,19 @@ export interface Location {
   // 将来: 緯度経度や気象庁エリアコードを追加可能
 }
 
-export type WeatherSource = 'manual' | 'jma' | 'open-meteo';
+export type WeatherSource = 'jma' | 'open-meteo';
 
-export interface Weather {
+/** 1日分の予報 */
+export interface DayForecast {
+  date: string; // YYYY-MM-DD(JST)
   high: number | null; // 最高気温(°C)
   low: number | null; // 最低気温(°C)
   label: string; // 例: "晴れ", "くもり時々雨"
+}
+
+/** 取得した予報(昨日・今日・明日の3日分など) */
+export interface Forecast {
+  days: DayForecast[];
   source: WeatherSource;
   fetchedAt: number; // Unix ms
 }
@@ -26,7 +33,6 @@ export interface AppState {
   children: Child[];
   currentChildId: ChildId;
   location: Location;
-  weather: Weather | null;
   thresholdTemp: number; // デフォルト 23
   customItems: Item[]; // ユーザーが追加した品目(バスタオルなど)
   updatedAt: number; // 競合解決用タイムスタンプ
