@@ -70,7 +70,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
 
   return (
     <div className="px-5 pt-2 pb-3">
-      <div className="text-[10px] tracking-[0.3em] text-stone-400 font-bold mb-2 px-1">日付を選ぶ</div>
+      <div className="text-[15px] tracking-[0.3em] text-stone-400 font-bold mb-2 px-1">日付を選ぶ</div>
       <div
         ref={scrollRef}
         className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1 no-scrollbar snap-x"
@@ -91,41 +91,41 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
               key={date}
               ref={active ? selectedRef : undefined}
               onClick={() => onSelectDate(date)}
-              className={`shrink-0 w-[68px] snap-center rounded-2xl py-2.5 flex flex-col items-center gap-0.5 transition-all active:scale-95 border ${
+              className={`shrink-0 w-[96px] snap-center rounded-2xl py-3.5 flex flex-col items-center gap-1 transition-all active:scale-95 border ${
                 active ? 'shadow-sm' : 'bg-white text-stone-600 border-stone-200'
               }`}
               style={active ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' } : undefined}
             >
-              <span className={`text-[11px] font-bold ${weekdayColor(wdNum)}`}>
+              <span className={`text-[16px] font-bold ${weekdayColor(wdNum)}`}>
                 {rel || jstWeekday(date)}
               </span>
-              <span className="text-base font-black leading-none text-stone-800">
+              <span className="text-[22px] font-black leading-none text-stone-800">
                 {Number(mm)}/{Number(dd)}
               </span>
               {Icon ? (
                 <Icon
-                  size={20}
+                  size={28}
                   strokeWidth={1.6}
                   className={`my-0.5 ${weatherIconClass(day?.label)}`}
                 />
               ) : (
-                <span className="my-0.5 h-5" />
+                <span className="my-0.5 h-7" />
               )}
               <span className="flex items-baseline gap-0.5 font-black leading-none">
-                <span className="text-[11px]" style={{ color: tempColor(day?.low ?? null) }}>
+                <span className="text-[17px]" style={{ color: tempColor(day?.low ?? null) }}>
                   {day?.low != null ? `${day.low}°` : '—'}
                 </span>
-                <span className="text-stone-300 text-[10px]">/</span>
-                <span className="text-[12px]" style={{ color: tempColor(day?.high ?? null) }}>
+                <span className="text-stone-300 text-[14px]">/</span>
+                <span className="text-[17px]" style={{ color: tempColor(day?.high ?? null) }}>
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>
               {isClosed ? (
-                <span className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${active ? 'bg-orange-200/60 text-orange-700' : 'bg-stone-100 text-stone-400'}`}>
+                <span className={`text-[14px] font-black leading-none px-2 py-0.5 rounded-md ${active ? 'bg-orange-200/60 text-orange-700' : 'bg-stone-100 text-stone-400'}`}>
                   休
                 </span>
               ) : (isHot || isCool) ? (
-                <span className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded-md ${
+                <span className={`text-[14px] font-black leading-none px-2 py-0.5 rounded-md ${
                   isHot
                     ? active ? 'bg-orange-200/60 text-orange-600' : 'bg-orange-50 text-orange-500'
                     : active ? 'bg-sky-200/60 text-sky-600' : 'bg-sky-50 text-sky-500'
@@ -133,7 +133,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
                   {isHot ? '半袖' : '長袖'}
                 </span>
               ) : (
-                <span className="h-[18px]" />
+                <span className="h-[26px]" />
               )}
             </button>
           );
