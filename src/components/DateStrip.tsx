@@ -88,6 +88,10 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
   const goToNextDaycareDay = () => {
     const next = nextDaycareDay(closedWeekdays, 1);
     onSelectDate(next);
+    // 再レンダー後に selectedRef が更新されてからスクロール
+    requestAnimationFrame(() => {
+      selectedRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    });
   };
 
   return (
@@ -98,7 +102,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
           onClick={goToNextDaycareDay}
           className="text-[13px] font-bold text-stone-500 bg-white border border-stone-200 rounded-xl px-3 py-1 active:scale-95 transition-all"
         >
-          次の登園日 →
+          次の登園日
         </button>
       </div>
       <div
