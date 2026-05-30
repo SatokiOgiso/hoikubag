@@ -3,6 +3,7 @@ import { getBag } from '../types';
 import { jstWeekdayNum } from './date';
 
 export function matchesRecurring(rule: RecurringItem, isoDate: string): boolean {
+  if (rule.startDate && isoDate < rule.startDate) return false;
   const wdNum = jstWeekdayNum(isoDate);
 
   if (rule.type === 'weekly') {
@@ -92,19 +93,23 @@ export function ruleLabel(rule: RecurringItem, allItems: Item[]): string {
   const item = allItems.find((i) => i.key === rule.itemKey);
   const emoji = item?.emoji ?? '📦';
   const qty = rule.qty > 1 ? ` · ${rule.qty}個` : '';
+  const startSuffix = rule.startDate
+    ? `  (${rule.startDate.slice(5).replace('-', '/')}〜)`
+    : '';
   if (rule.type === 'weekly') {
     const wdLabels = (rule.weekdays ?? []).map((w) => '日月火水木金土'[w]).join('・');
     const interval = rule.interval ?? 1;
     const prefix =
       interval === 1 ? '毎週' : interval === 2 ? '隔週' : `${interval}週ごと`;
-    return `${emoji} ${rule.itemKey}${qty}  ${prefix}${wdLabels}`;
+    return `${emoji} ${rule.itemKey}${qty}  ${prefix}${wdLabels}${startSuffix}`;
   }
   if (rule.type === 'monthly') {
     const mp = rule.monthlyPattern;
-    if (mp?.kind === 'dayOfMonth') return `${emoji} ${rule.itemKey}${qty}  毎月${mp.day}日`;
+    if (mp?.kind === 'dayOfMonth')
+      return `${emoji} ${rule.itemKey}${qty}  毎月${mp.day}日${startSuffix}`;
     if (mp?.kind === 'nthWeekday') {
       const wdLabel = '日月火水木金土'[mp.weekday];
-      return `${emoji} ${rule.itemKey}${qty}  毎月第${mp.nth}${wdLabel}曜日`;
+      return `${emoji} ${rule.itemKey}${qty}  毎月第${mp.nth}${wdLabel}曜日${startSuffix}`;
     }
   }
   return `${emoji} ${rule.itemKey}${qty}`;
