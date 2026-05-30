@@ -12,14 +12,14 @@ import {
   type StorageProvider,
 } from '../lib/storage';
 
-import type { Forecast } from '../types';
-import { uid } from '../lib/date';
+import type { Forecast, DayBag } from '../types';
+import { uid, jstDateOffset } from '../lib/date';
 import { fetchForecast } from '../lib/weather';
 
 export type SyncStatus = 'local' | 'ok' | 'error';
 
 function initialState(): AppState {
-  const firstChild: Child = { id: uid(), name: '子ども1', items: {}, defaults: {} };
+  const firstChild: Child = { id: uid(), name: '子ども1', bags: {}, defaults: {} };
   return {
     children: [firstChild],
     currentChildId: firstChild.id,
@@ -35,6 +35,8 @@ export function useAppState() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
+  // 選択中の日付(YYYY-MM-DD)。既定は明日。揮発(同期しない)
+  const [selectedDate, setSelectedDate] = useState<string>(() => jstDateOffset(1));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [syncError, setSyncError] = useState<string | null>(null);
   // 天気は同期せずデバイスごとにアクセスのたび取得(揮発)
@@ -146,34 +148,55 @@ export function useAppState() {
     []
   );
 
+  // 現在の子どもの「選択中の日付」のかばんを更新する
+  const mapCurrentBag = useCallback(
+    (s: AppState, date: string, fn: (b: DayBag) => DayBag): AppState =>
+      mapCurrentChild(s, (c) => {
+        const bag = c.bags?.[date] ?? { items: {}, confirmed: false };
+        const nextBag = fn({ items: { ...bag.items }, confirmed: bag.confirmed });
+        const bags = { ...c.bags };
+        // 空かつ未確定のかばんは保持しない(肥大化を避ける)
+        if (Object.keys(nextBag.items).length === 0 && !nextBag.confirmed) {
+          delete bags[date];
+        } else {
+          bags[date] = nextBag;
+        }
+        return { ...c, bags };
+      }),
+    [mapCurrentChild]
+  );
+
   const changeItem = useCallback(
-    (key: string, delta: number) => {
+    (date: string, key: string, delta: number) => {
       setState((s) => {
         if (!s) return s;
-        const next = mapCurrentChild(s, (c) => {
-          const items = { ...c.items };
+        const next = mapCurrentBag(s, date, (b) => {
+          const items = { ...b.items };
           const v = Math.max(0, (items[key] || 0) + delta);
           if (v === 0) delete items[key];
           else items[key] = v;
           // 確定後に内容を変えたら確定を解除する
-          return { ...c, items, confirmed: false };
+          return { items, confirmed: false };
         });
         save(next);
         return next;
       });
     },
-    [mapCurrentChild, save]
+    [mapCurrentBag, save]
   );
 
-  /** 現在の子どもの確定状態をトグル */
-  const toggleConfirm = useCallback(() => {
-    setState((s) => {
-      if (!s) return s;
-      const next = mapCurrentChild(s, (c) => ({ ...c, confirmed: !c.confirmed }));
-      save(next);
-      return next;
-    });
-  }, [mapCurrentChild, save]);
+  /** 現在の子ども・指定日の確定状態をトグル */
+  const toggleConfirm = useCallback(
+    (date: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = mapCurrentBag(s, date, (b) => ({ ...b, confirmed: !b.confirmed }));
+        save(next);
+        return next;
+      });
+    },
+    [mapCurrentBag, save]
+  );
 
   const changeDefault = useCallback(
     (key: string, delta: number) => {
@@ -193,15 +216,22 @@ export function useAppState() {
     [mapCurrentChild, save]
   );
 
-  const saveCurrentAsDefault = useCallback(() => {
-    setState((s) => {
-      if (!s) return s;
-      const next = mapCurrentChild(s, (c) => ({ ...c, defaults: { ...c.items } }));
-      save(next);
-      return next;
-    });
-    showToast('現在の入力をデフォルトに保存しました');
-  }, [mapCurrentChild, save, showToast]);
+  /** 指定日のかばんの内容をデフォルトとして保存 */
+  const saveCurrentAsDefault = useCallback(
+    (date: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = mapCurrentChild(s, (c) => ({
+          ...c,
+          defaults: { ...(c.bags?.[date]?.items ?? {}) },
+        }));
+        save(next);
+        return next;
+      });
+      showToast('現在の入力をデフォルトに保存しました');
+    },
+    [mapCurrentChild, save, showToast]
+  );
 
   const addChild = useCallback(() => {
     setState((s) => {
@@ -209,7 +239,7 @@ export function useAppState() {
       const newChild: Child = {
         id: uid(),
         name: `子ども${s.children.length + 1}`,
-        items: {},
+        bags: {},
         defaults: {},
       };
       const next = { ...s, children: [...s.children, newChild], currentChildId: newChild.id };
@@ -266,14 +296,17 @@ export function useAppState() {
     [save]
   );
 
+  /** 指定日の指定子どものかばんをデフォルトに戻す */
   const resetChild = useCallback(
-    (id: string) => {
+    (date: string, id: string) => {
       setState((s) => {
         if (!s) return s;
         const next = {
           ...s,
           children: s.children.map((c) =>
-            c.id === id ? { ...c, items: { ...c.defaults }, confirmed: false } : c
+            c.id === id
+              ? { ...c, bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } } }
+              : c
           ),
         };
         save(next);
@@ -284,18 +317,25 @@ export function useAppState() {
     [save, showToast]
   );
 
-  const resetAll = useCallback(() => {
-    setState((s) => {
-      if (!s) return s;
-      const next = {
-        ...s,
-        children: s.children.map((c) => ({ ...c, items: { ...c.defaults }, confirmed: false })),
-      };
-      save(next);
-      return next;
-    });
-    showToast('全員デフォルトに戻しました');
-  }, [save, showToast]);
+  /** 指定日の全員のかばんをデフォルトに戻す */
+  const resetAll = useCallback(
+    (date: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = {
+          ...s,
+          children: s.children.map((c) => ({
+            ...c,
+            bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
+          })),
+        };
+        save(next);
+        return next;
+      });
+      showToast('全員デフォルトに戻しました');
+    },
+    [save, showToast]
+  );
 
   const setLocation = useCallback(
     (name: string) => {
@@ -389,11 +429,14 @@ export function useAppState() {
         const next: AppState = {
           ...s,
           customItems: s.customItems.filter((i) => i.key !== key),
-          children: s.children.map((c) => ({
-            ...c,
-            items: strip(c.items),
-            defaults: strip(c.defaults),
-          })),
+          children: s.children.map((c) => {
+            // すべての日付のかばんから取り除く
+            const bags: Record<string, DayBag> = {};
+            for (const [d, bag] of Object.entries(c.bags || {})) {
+              bags[d] = { items: strip(bag.items), confirmed: bag.confirmed };
+            }
+            return { ...c, bags, defaults: strip(c.defaults) };
+          }),
         };
         save(next);
         return next;
@@ -458,6 +501,8 @@ export function useAppState() {
     forecast,
     weatherLoading,
     weatherError,
+    selectedDate,
+    setSelectedDate,
     actions: {
       changeItem,
       changeDefault,

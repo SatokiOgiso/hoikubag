@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
 import { DEFAULT_THRESHOLD, ITEMS } from './constants';
-import { jstDateOffset } from './lib/date';
 import { useAppState } from './hooks/useAppState';
+import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
 import WeatherCard from './components/WeatherCard';
 import ChildTabs from './components/ChildTabs';
@@ -20,6 +20,8 @@ export default function App() {
     forecast,
     weatherLoading,
     weatherError,
+    selectedDate,
+    setSelectedDate,
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
@@ -35,10 +37,9 @@ export default function App() {
   const currentChild =
     state.children.find((c) => c.id === state.currentChildId) || state.children[0];
 
-  // 明日の最高気温で袖の警告を判定
-  const tomorrowDate = jstDateOffset(1);
-  const tomorrowForecast = forecast?.days.find((d) => d.date === tomorrowDate) ?? null;
-  const tempHigh = tomorrowForecast?.high ?? null;
+  // 選択中の日付の最高気温で袖の警告を判定
+  const selectedForecast = forecast?.days.find((d) => d.date === selectedDate) ?? null;
+  const tempHigh = selectedForecast?.high ?? null;
   const threshold = state.thresholdTemp ?? DEFAULT_THRESHOLD;
   const hasTemp = tempHigh != null;
   const isHot = hasTemp && tempHigh > threshold;
@@ -78,12 +79,26 @@ export default function App() {
           </div>
         </header>
 
-        <BagSummary state={state} items={allItems} onSelectChild={actions.selectChild} />
+        {/* 日付ストリップ(最上部・横スクロール) */}
+        <DateStrip
+          selectedDate={selectedDate}
+          forecast={forecast}
+          threshold={threshold}
+          onSelectDate={setSelectedDate}
+        />
+
+        <BagSummary
+          state={state}
+          items={allItems}
+          date={selectedDate}
+          onSelectChild={actions.selectChild}
+        />
 
         <WeatherCard
           locationName={state.location?.name}
           forecast={forecast}
           threshold={threshold}
+          selectedDate={selectedDate}
           weatherLoading={weatherLoading}
           weatherError={weatherError}
           onFetchWeather={actions.fetchWeather}
@@ -92,11 +107,13 @@ export default function App() {
         <ChildTabs
           children={state.children}
           currentChildId={state.currentChildId}
+          date={selectedDate}
           onSelectChild={actions.selectChild}
         />
 
         <ItemList
           child={currentChild}
+          date={selectedDate}
           items={allItems}
           isHot={isHot}
           isCool={isCool}
@@ -113,6 +130,7 @@ export default function App() {
           familyId={familyId}
           syncStatus={syncStatus}
           syncError={syncError}
+          selectedDate={selectedDate}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />

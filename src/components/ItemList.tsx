@@ -1,20 +1,23 @@
 import { Plus, Minus, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import type { Child, Item } from '../types';
+import { getBag } from '../types';
 import { ACCENT } from '../constants';
 
 interface Props {
   child: Child;
+  date: string;
   items: Item[];
   isHot: boolean;
   isCool: boolean;
-  onChangeItem: (key: string, delta: number) => void;
-  onReset: (id: string) => void;
-  onToggleConfirm: () => void;
+  onChangeItem: (date: string, key: string, delta: number) => void;
+  onReset: (date: string, id: string) => void;
+  onToggleConfirm: (date: string) => void;
 }
 
-/** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告) */
+/** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告・選択日) */
 export default function ItemList({
   child,
+  date,
   items: itemDefs,
   isHot,
   isCool,
@@ -22,9 +25,10 @@ export default function ItemList({
   onReset,
   onToggleConfirm,
 }: Props) {
-  const items = child.items || {};
+  const bag = getBag(child, date);
+  const items = bag.items;
   const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
-  const confirmed = !!child.confirmed;
+  const confirmed = !!bag.confirmed;
 
   return (
     <div className="px-5">
@@ -34,7 +38,7 @@ export default function ItemList({
         </h2>
         {totalCount > 0 && (
           <button
-            onClick={() => onReset(child.id)}
+            onClick={() => onReset(date, child.id)}
             className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 active:scale-95"
           >
             <RefreshCw size={12} /> リセット
@@ -84,7 +88,7 @@ export default function ItemList({
                 </div>
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => onChangeItem(item.key, -1)}
+                    onClick={() => onChangeItem(date, item.key, -1)}
                     disabled={count === 0}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
                       count === 0 ? 'bg-stone-100 text-stone-300' : 'bg-stone-100 text-stone-700'
@@ -101,7 +105,7 @@ export default function ItemList({
                     {count}
                   </div>
                   <button
-                    onClick={() => onChangeItem(item.key, 1)}
+                    onClick={() => onChangeItem(date, item.key, 1)}
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all"
                     style={{ background: ACCENT }}
                     aria-label="増やす"
@@ -117,7 +121,7 @@ export default function ItemList({
 
       {/* 確定ボタン(確定/取り消しをトグル) */}
       <button
-        onClick={onToggleConfirm}
+        onClick={() => onToggleConfirm(date)}
         className={`w-full mt-4 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all ${
           confirmed
             ? 'bg-white border-2 border-emerald-500 text-emerald-600'

@@ -1,31 +1,34 @@
 import { Check } from 'lucide-react';
 import type { AppState, Item } from '../types';
+import { getBag } from '../types';
 import { ACCENT } from '../constants';
-import { tomorrowLabel } from '../lib/date';
+import { dateLabel } from '../lib/date';
 
 interface Props {
   state: AppState;
   items: Item[];
+  date: string;
   onSelectChild: (id: string) => void;
 }
 
-/** 明日のかばん(最上部・全員分サマリー) */
-export default function BagSummary({ state, items, onSelectChild }: Props) {
+/** かばん(最上部・全員分サマリー・選択日) */
+export default function BagSummary({ state, items, date, onSelectChild }: Props) {
   return (
     <div className="px-5 mb-4">
       <div className="rounded-2xl bg-stone-800 text-white p-4 shadow-sm">
         <div className="flex items-baseline justify-between mb-3">
           <div className="text-[10px] text-stone-400 tracking-[0.3em] font-bold">
-            🎒 明日のかばん
+            🎒 かばんの中身
           </div>
-          <div className="text-xs text-stone-400 font-bold">{tomorrowLabel()}</div>
+          <div className="text-xs text-stone-400 font-bold">{dateLabel(date)}</div>
         </div>
         <div>
           {state.children.map((c, idx) => {
-            const cItems = c.items || {};
+            const bag = getBag(c, date);
+            const cItems = bag.items;
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
             const active = c.id === state.currentChildId;
-            const confirmed = !!c.confirmed;
+            const confirmed = !!bag.confirmed;
             return (
               <button
                 key={c.id}

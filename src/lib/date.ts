@@ -24,9 +24,13 @@ export function jstWeekday(isoDate: string): string {
   }).format(new Date(`${isoDate}T00:00:00+09:00`));
 }
 
-/** 「5月31日(日)」のような明日の日付ラベル(JST基準) */
-export function tomorrowLabel(): string {
-  const iso = jstDateOffset(1);
-  const [, mm, dd] = iso.split('-');
-  return `${Number(mm)}月${Number(dd)}日(${jstWeekday(iso)})`;
+/** 「5月31日(日)」のような日付ラベル(JST基準)。相対語(昨日/今日/明日)も前置 */
+export function dateLabel(isoDate: string): string {
+  const [, mm, dd] = isoDate.split('-');
+  const base = `${Number(mm)}月${Number(dd)}日(${jstWeekday(isoDate)})`;
+  let rel = '';
+  if (isoDate === jstDateOffset(-1)) rel = '昨日 · ';
+  else if (isoDate === jstDateOffset(0)) rel = '今日 · ';
+  else if (isoDate === jstDateOffset(1)) rel = '明日 · ';
+  return rel + base;
 }

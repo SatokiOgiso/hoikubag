@@ -1,18 +1,20 @@
 import type { Child } from '../types';
+import { getBag } from '../types';
 
 interface Props {
   children: Child[];
   currentChildId: string;
+  date: string;
   onSelectChild: (id: string) => void;
 }
 
-/** 子どもタブ(横スクロール) */
-export default function ChildTabs({ children, currentChildId, onSelectChild }: Props) {
+/** 子どもタブ(横スクロール・選択日の点数) */
+export default function ChildTabs({ children, currentChildId, date, onSelectChild }: Props) {
   return (
     <div className="px-5 mb-4">
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 no-scrollbar">
         {children.map((c) => {
-          const childTotal = Object.values(c.items || {}).reduce((a, b) => a + b, 0);
+          const childTotal = Object.values(getBag(c, date).items).reduce((a, b) => a + b, 0);
           const active = c.id === currentChildId;
           return (
             <button

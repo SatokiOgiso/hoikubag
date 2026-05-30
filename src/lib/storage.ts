@@ -1,5 +1,6 @@
 import type { AppState } from '../types';
 import { STORAGE_KEY } from '../constants';
+import { jstDateOffset } from './date';
 
 /**
  * 永続化の抽象レイヤ。
@@ -23,11 +24,24 @@ export function migrate(raw: unknown): AppState | null {
   const data = raw as Partial<AppState>;
   if (!Array.isArray(data.children)) return null;
 
-  const children = data.children.map((c) => ({
-    ...c,
-    items: c.items || {},
-    defaults: c.defaults || {},
-  }));
+  const children = data.children.map((c) => {
+    // 新形式: bags をそのまま採用
+    let bags = c.bags && typeof c.bags === 'object' ? { ...c.bags } : {};
+    // 旧形式(items/confirmed のみ)→ 明日のかばんに移行
+    if (!c.bags && c.items && Object.keys(c.items).length > 0) {
+      bags = { [jstDateOffset(1)]: { items: c.items, confirmed: !!c.confirmed } };
+    }
+    // 各 bag の items を保証
+    for (const d of Object.keys(bags)) {
+      bags[d] = { items: bags[d]?.items || {}, confirmed: !!bags[d]?.confirmed };
+    }
+    return {
+      id: c.id,
+      name: c.name,
+      bags,
+      defaults: c.defaults || {},
+    };
+  });
 
   return {
     children,

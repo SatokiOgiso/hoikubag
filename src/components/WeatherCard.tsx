@@ -1,12 +1,13 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import type { Forecast, DayForecast } from '../types';
-import { jstDateOffset, jstWeekday } from '../lib/date';
+import type { Forecast } from '../types';
+import { jstWeekday } from '../lib/date';
 import { iconFromLabel } from '../lib/icons';
 
 interface Props {
   locationName?: string;
   forecast: Forecast | null;
   threshold: number;
+  selectedDate: string;
   weatherLoading: boolean;
   weatherError: string | null;
   onFetchWeather: () => void;
@@ -21,14 +22,6 @@ const SOURCE_NOTE: Record<string, string> = {
 function shortDate(date: string): string {
   const [, mm, dd] = date.split('-');
   return `${Number(mm)}/${Number(dd)}(${jstWeekday(date)})`;
-}
-
-/** 相対ラベル(昨日/今日/明日)。それ以外は空 */
-function relativeLabel(date: string): string {
-  if (date === jstDateOffset(-1)) return '昨日';
-  if (date === jstDateOffset(0)) return '今日';
-  if (date === jstDateOffset(1)) return '明日';
-  return '';
 }
 
 // 気温→色のアンカー(15:緑 → 25:赤オレンジ → 30:赤 → 35:紫)
@@ -60,89 +53,45 @@ function tempColor(t: number | null): string {
 
 const fmtTemp = (t: number | null): string => (t != null ? `${t}°` : '—');
 
-function DayCell({ day, threshold }: { day: DayForecast; threshold: number }) {
-  const rel = relativeLabel(day.date);
-  const isTomorrow = rel === '明日';
-  const Icon = iconFromLabel(day.label);
-  const hot = day.high != null && day.high > threshold;
-  const cool = day.high != null && day.high <= threshold;
-
-  return (
-    <div
-      className={`flex-1 rounded-2xl px-2 py-3 text-center transition-all ${
-        isTomorrow ? 'border-2' : 'border border-stone-100'
-      }`}
-      style={
-        isTomorrow
-          ? hot
-            ? { background: 'linear-gradient(135deg, #FEEAD2, #FFF6E8)', borderColor: '#F5C99A' }
-            : cool
-              ? { background: 'linear-gradient(135deg, #DDEDF5, #F0F7FB)', borderColor: '#B5D4E5' }
-              : { borderColor: '#D6D3D1' }
-          : {}
-      }
-    >
-      <div className={`text-xs font-bold ${isTomorrow ? 'text-stone-800' : 'text-stone-500'}`}>
-        {rel || shortDate(day.date)}
-      </div>
-      <div className="text-[10px] text-stone-400 mb-1">{rel ? shortDate(day.date) : ''}</div>
-      <div className="flex justify-center my-1">
-        <Icon
-          size={30}
-          strokeWidth={1.5}
-          className={hot ? 'text-orange-500' : cool ? 'text-sky-600' : 'text-stone-500'}
-        />
-      </div>
-      <div className="text-[11px] text-stone-500 truncate mb-1.5" title={day.label}>
-        {day.label || '—'}
-      </div>
-
-      {/* 最低 / 最高(大きく・気温に応じた色) */}
-      <div className="text-[9px] text-stone-400 font-bold tracking-wide">最低 / 最高</div>
-      <div className="flex items-baseline justify-center gap-1 font-black leading-none">
-        <span className={isTomorrow ? 'text-3xl' : 'text-2xl'} style={{ color: tempColor(day.low) }}>
-          {fmtTemp(day.low)}
-        </span>
-        <span className="text-stone-300 text-base">/</span>
-        <span className={isTomorrow ? 'text-3xl' : 'text-2xl'} style={{ color: tempColor(day.high) }}>
-          {fmtTemp(day.high)}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/** 天気カード(昨日・今日・明日を自動取得して表示) */
+/** 天気カード(選択日の予報を表示) */
 export default function WeatherCard({
   locationName,
   forecast,
   threshold,
+  selectedDate,
   weatherLoading,
   weatherError,
   onFetchWeather,
 }: Props) {
-  // 昨日→今日→明日 の順に並べる
-  const order = [jstDateOffset(-1), jstDateOffset(0), jstDateOffset(1)];
-  const days = forecast
-    ? [...forecast.days].sort((a, b) => order.indexOf(a.date) - order.indexOf(b.date))
-    : [];
-  const tomorrow = days.find((d) => d.date === jstDateOffset(1)) ?? null;
-  const tHigh = tomorrow?.high ?? null;
+  const day = forecast?.days.find((d) => d.date === selectedDate) ?? null;
+  const tHigh = day?.high ?? null;
   const isHot = tHigh != null && tHigh > threshold;
   const isCool = tHigh != null && tHigh <= threshold;
   const sourceNote = forecast ? (SOURCE_NOTE[forecast.source] ?? '') : '';
+  const Icon = iconFromLabel(day?.label);
 
   return (
     <div className="px-5 mb-5">
-      <div className="rounded-3xl p-5 bg-white border border-stone-200">
+      <div
+        className="rounded-3xl p-5 border transition-all"
+        style={
+          isHot
+            ? { background: 'linear-gradient(135deg, #FEEAD2, #FFF6E8)', borderColor: '#F5C99A' }
+            : isCool
+              ? { background: 'linear-gradient(135deg, #DDEDF5, #F0F7FB)', borderColor: '#B5D4E5' }
+              : { background: '#fff', borderColor: '#E7E5E4' }
+        }
+      >
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs text-stone-500 font-bold tracking-wider">明日のかばんの目安</div>
+          <div className="text-xs text-stone-500 font-bold tracking-wider">
+            {shortDate(selectedDate)} の天気
+          </div>
           <div className="flex items-center gap-2">
             <div className="text-xs text-stone-500 font-bold">📍 {locationName || '地域未設定'}</div>
             <button
               onClick={onFetchWeather}
               disabled={weatherLoading}
-              className="w-8 h-8 rounded-lg bg-stone-50 border border-stone-200 flex items-center justify-center text-stone-600 active:scale-90 transition-all disabled:opacity-50"
+              className="w-8 h-8 rounded-lg bg-white/70 border border-stone-200 flex items-center justify-center text-stone-600 active:scale-90 transition-all disabled:opacity-50"
               aria-label="天気を再取得"
             >
               <RefreshCw size={14} className={weatherLoading ? 'animate-spin' : ''} />
@@ -150,30 +99,47 @@ export default function WeatherCard({
           </div>
         </div>
 
-        {days.length > 0 ? (
+        {day ? (
           <>
-            <div className="flex gap-2">
-              {days.map((d) => (
-                <DayCell key={d.date} day={d} threshold={threshold} />
-              ))}
+            <div className="flex items-center gap-4">
+              <Icon
+                size={56}
+                strokeWidth={1.4}
+                className={isHot ? 'text-orange-500' : isCool ? 'text-sky-600' : 'text-stone-500'}
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-stone-500 font-bold mb-0.5 truncate" title={day.label}>
+                  {day.label || '—'}
+                </div>
+                <div className="text-[10px] text-stone-400 font-bold tracking-wide">最低 / 最高</div>
+                <div className="flex items-baseline gap-1.5 font-black leading-none">
+                  <span className="text-4xl" style={{ color: tempColor(day.low) }}>
+                    {fmtTemp(day.low)}
+                  </span>
+                  <span className="text-stone-300 text-2xl">/</span>
+                  <span className="text-4xl" style={{ color: tempColor(day.high) }}>
+                    {fmtTemp(day.high)}
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="mt-3 pt-3 border-t border-stone-200/60">
               {isHot && (
                 <div className="flex items-center gap-2 text-orange-700 text-sm font-bold">
                   <AlertTriangle size={15} />
-                  明日は暑い予報。<span className="underline">👕半袖</span>がおすすめ
+                  暑い予報。<span className="underline">👕半袖</span>がおすすめ
                 </div>
               )}
               {isCool && (
                 <div className="flex items-center gap-2 text-sky-700 text-sm font-bold">
                   <AlertTriangle size={15} />
-                  明日は涼しい予報。<span className="underline">🧥長袖</span>がおすすめ
+                  涼しい予報。<span className="underline">🧥長袖</span>がおすすめ
                 </div>
               )}
               {!isHot && !isCool && (
                 <div className="text-xs text-stone-500">
-                  明日の気温が取得できませんでした(しきい値 {threshold}°C)
+                  この日の気温が取得できませんでした(しきい値 {threshold}°C)
                 </div>
               )}
               {sourceNote && (
@@ -188,7 +154,7 @@ export default function WeatherCard({
         ) : (
           <div className="py-6 text-center">
             <div className="text-sm text-stone-500 mb-2">
-              {weatherError || '天気を取得できませんでした'}
+              {weatherError || 'この日の天気予報はありません'}
             </div>
             <button
               onClick={onFetchWeather}

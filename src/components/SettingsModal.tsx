@@ -11,6 +11,7 @@ interface Props {
   familyId: string | null;
   syncStatus: SyncStatus;
   syncError: string | null;
+  selectedDate: string;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -18,10 +19,10 @@ interface Props {
     removeChild: (id: string) => void;
     selectChild: (id: string) => void;
     changeDefault: (key: string, delta: number) => void;
-    saveCurrentAsDefault: () => void;
+    saveCurrentAsDefault: (date: string) => void;
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
-    resetAll: () => void;
+    resetAll: (date: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
     enableSharing: () => void;
@@ -37,6 +38,7 @@ export default function SettingsModal({
   familyId,
   syncStatus,
   syncError,
+  selectedDate,
   onClose,
   actions,
 }: Props) {
@@ -232,7 +234,7 @@ export default function SettingsModal({
             </div>
 
             <button
-              onClick={actions.saveCurrentAsDefault}
+              onClick={() => actions.saveCurrentAsDefault(selectedDate)}
               className="w-full bg-white rounded-xl py-2.5 mb-2 border border-stone-200 text-stone-700 font-bold text-xs hover:bg-stone-50 active:scale-95 transition-all"
             >
               📥 {currentChild?.name}の現在の入力をデフォルトに保存
@@ -351,7 +353,7 @@ export default function SettingsModal({
           <section>
             <button
               onClick={() => {
-                actions.resetAll();
+                actions.resetAll(selectedDate);
                 onClose();
               }}
               className="w-full bg-white rounded-xl py-3 border border-stone-200 text-stone-700 font-bold hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"

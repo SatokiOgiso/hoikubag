@@ -1,11 +1,19 @@
 export type ChildId = string; // uid
 
+/** 1日分のかばんの中身 */
+export interface DayBag {
+  items: Record<string, number>; // 入力。例: { "おむつ": 3 }
+  confirmed?: boolean; // その日の準備を確定したか
+}
+
 export interface Child {
   id: ChildId;
   name: string; // 例: "太郎"
-  items: Record<string, number>; // 翌日の入力。例: { "おむつ": 3 }
+  bags: Record<string, DayBag>; // 日付(YYYY-MM-DD)ごとのかばん
   defaults: Record<string, number>; // リセット時の初期値。例: { "おむつ": 3, "肌着": 1 }
-  confirmed?: boolean; // 翌日の準備を確定したか
+  // 旧形式(マイグレーション用・読み込み時のみ)
+  items?: Record<string, number>;
+  confirmed?: boolean;
 }
 
 export interface Location {
@@ -37,6 +45,11 @@ export interface AppState {
   thresholdTemp: number; // デフォルト 23
   customItems: Item[]; // ユーザーが追加した品目(バスタオルなど)
   updatedAt: number; // 競合解決用タイムスタンプ
+}
+
+/** 子どもの指定日のかばん(なければ空)を取得 */
+export function getBag(child: Child, date: string): DayBag {
+  return child.bags?.[date] ?? { items: {}, confirmed: false };
 }
 
 /** 持ち物の品目定義 */
