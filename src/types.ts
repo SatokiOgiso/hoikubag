@@ -22,6 +22,7 @@ export interface RecurringItem {
   interval?: number;      // weekly 用: N週ごと(1=毎週、2=隔週…)
   anchorDate?: string;    // interval>1 の基準日(YYYY-MM-DD)
   monthlyPattern?: MonthlyPattern;
+  startDate?: string;     // 開始日(YYYY-MM-DD)。この日より前は適用しない
 }
 
 export interface Child {
