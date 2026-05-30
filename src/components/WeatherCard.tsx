@@ -73,7 +73,7 @@ export default function WeatherCard({
   return (
     <div className="px-5 mb-5">
       <div
-        className="rounded-3xl p-5 border transition-all"
+        className="rounded-2xl px-4 py-2 border transition-all"
         style={
           isHot
             ? { background: 'linear-gradient(135deg, #FEEAD2, #FFF6E8)', borderColor: '#F5C99A' }
@@ -82,85 +82,59 @@ export default function WeatherCard({
               : { background: '#fff', borderColor: '#E7E5E4' }
         }
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-xs text-stone-500 font-bold tracking-wider">
-            {shortDate(selectedDate)} の天気
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-stone-500 font-bold">📍 {locationName || '地域未設定'}</div>
-            <button
-              onClick={onFetchWeather}
-              disabled={weatherLoading}
-              className="w-8 h-8 rounded-lg bg-white/70 border border-stone-200 flex items-center justify-center text-stone-600 active:scale-90 transition-all disabled:opacity-50"
-              aria-label="天気を再取得"
-            >
-              <RefreshCw size={14} className={weatherLoading ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        </div>
-
-        {day ? (
-          <>
-            <div className="flex items-center gap-3">
-              <Icon
-                size={56}
-                strokeWidth={1.4}
-                className={isHot ? 'text-orange-500' : isCool ? 'text-sky-600' : 'text-stone-500'}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-stone-500 font-bold mb-0.5 truncate" title={day.label}>
-                  {day.label || '—'}
-                </div>
-                <div className="text-[10px] text-stone-400 font-bold tracking-wide">最低 / 最高</div>
-                <div className="flex items-baseline gap-1.5 font-black leading-none">
-                  <span className="text-4xl" style={{ color: tempColor(day.low) }}>
-                    {fmtTemp(day.low)}
-                  </span>
-                  <span className="text-stone-300 text-2xl">/</span>
-                  <span className="text-4xl" style={{ color: tempColor(day.high) }}>
-                    {fmtTemp(day.high)}
-                  </span>
-                </div>
+        <div className="flex items-center gap-2">
+          {day ? (
+            <Icon
+              size={28}
+              strokeWidth={1.4}
+              className={isHot ? 'text-orange-500' : isCool ? 'text-sky-600' : 'text-stone-500'}
+            />
+          ) : null}
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-stone-500 font-bold tracking-wider leading-none mb-0.5">
+              {shortDate(selectedDate)} の天気　📍 {locationName || '地域未設定'}
+            </div>
+            {day ? (
+              <div className="flex items-baseline gap-1 font-black leading-none">
+                <span className="text-xl" style={{ color: tempColor(day.low) }}>
+                  {fmtTemp(day.low)}
+                </span>
+                <span className="text-stone-300 text-base">/</span>
+                <span className="text-xl" style={{ color: tempColor(day.high) }}>
+                  {fmtTemp(day.high)}
+                </span>
+                <span className="text-[10px] text-stone-400 font-bold ml-1 truncate">{day.label || ''}</span>
               </div>
-              {/* 服装アドバイスバッジ(右カラム) */}
-              {(isHot || isCool) && (
-                <div
-                  className={`shrink-0 flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-3 text-center ${
-                    isHot
-                      ? 'bg-orange-100/80 text-orange-700'
-                      : 'bg-sky-100/80 text-sky-700'
-                  }`}
-                >
-                  <AlertTriangle size={13} />
-                  <div className="text-[9px] font-bold leading-tight">
-                    {isHot ? '暑い予報' : '涼しい予報'}
-                  </div>
-                  <div className="text-xl">{isHot ? '👕' : '🧥'}</div>
-                  <div className="text-xs font-bold">{isHot ? '半袖' : '長袖'}</div>
-                </div>
-              )}
-            </div>
-            {sourceNote && (
-              <div className="text-[10px] text-stone-400 mt-2.5">天気: {sourceNote}</div>
+            ) : weatherLoading ? (
+              <div className="text-stone-400 text-xs flex items-center gap-1">
+                <RefreshCw size={11} className="animate-spin" /> 取得中…
+              </div>
+            ) : (
+              <button onClick={onFetchWeather} className="text-xs text-stone-500 underline active:scale-95">
+                {weatherError || '予報なし'} — 再取得
+              </button>
             )}
-          </>
-        ) : weatherLoading ? (
-          <div className="py-8 text-center text-stone-400 text-sm flex items-center justify-center gap-2">
-            <RefreshCw size={16} className="animate-spin" /> 天気を取得中…
           </div>
-        ) : (
-          <div className="py-6 text-center">
-            <div className="text-sm text-stone-500 mb-2">
-              {weatherError || 'この日の天気予報はありません'}
-            </div>
-            <button
-              onClick={onFetchWeather}
-              className="text-xs text-stone-600 underline active:scale-95"
+          {day && (isHot || isCool) && (
+            <div
+              className={`shrink-0 flex items-center gap-1 rounded-xl px-2 py-1 ${
+                isHot ? 'bg-orange-100/80 text-orange-700' : 'bg-sky-100/80 text-sky-700'
+              }`}
             >
-              もう一度取得
-            </button>
-          </div>
-        )}
+              <AlertTriangle size={10} />
+              <span className="text-base leading-none">{isHot ? '👕' : '🧥'}</span>
+              <span className="text-[10px] font-bold">{isHot ? '半袖' : '長袖'}</span>
+            </div>
+          )}
+          <button
+            onClick={onFetchWeather}
+            disabled={weatherLoading}
+            className="w-6 h-6 rounded-md bg-white/70 border border-stone-200 flex items-center justify-center text-stone-600 active:scale-90 transition-all disabled:opacity-50 shrink-0"
+            aria-label="天気を再取得"
+          >
+            <RefreshCw size={11} className={weatherLoading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
     </div>
   );
