@@ -9,7 +9,8 @@ import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
 export default function App() {
-  const { state, loading, toast, familyId, syncStatus, syncError, actions } = useAppState();
+  const { state, loading, toast, familyId, syncStatus, syncError, weatherLoading, weatherError, actions } =
+    useAppState();
   const [showSettings, setShowSettings] = useState(false);
 
   if (loading || !state) {
@@ -67,6 +68,9 @@ export default function App() {
 
         <WeatherCard
           state={state}
+          weatherLoading={weatherLoading}
+          weatherError={weatherError}
+          onFetchWeather={actions.fetchWeather}
           onSetManualWeather={actions.setManualWeather}
           onClearWeather={actions.clearWeather}
         />

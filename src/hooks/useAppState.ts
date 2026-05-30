@@ -12,8 +12,10 @@ import {
   type StorageProvider,
 } from '../lib/storage';
 
-export type SyncStatus = 'local' | 'ok' | 'error';
 import { uid } from '../lib/date';
+import { fetchWeather as fetchWeatherApi } from '../lib/weather';
+
+export type SyncStatus = 'local' | 'ok' | 'error';
 
 function initialState(): AppState {
   const firstChild: Child = { id: uid(), name: '子ども1', items: {}, defaults: {} };
@@ -35,8 +37,12 @@ export function useAppState() {
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
   // 競合解決用に最新の updatedAt を ref で保持(リスナーの再登録を避ける)
   const updatedAtRef = useRef(0);
+  // 非同期処理から最新の state を参照するための ref
+  const stateRef = useRef<AppState | null>(null);
   // 現在の永続化 Provider(共有の有無で差し替わる)
   const providerRef = useRef<StorageProvider>(createProvider(null));
 
@@ -118,6 +124,11 @@ export function useAppState() {
       window.removeEventListener('focus', onVisible);
     };
   }, [loading]);
+
+  // 非同期処理(天気取得など)が最新 state を参照できるようにする
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -329,6 +340,29 @@ export function useAppState() {
     });
   }, [save]);
 
+  /** 気象庁から明日の天気を取得して保存 */
+  const fetchWeather = useCallback(async () => {
+    const name = stateRef.current?.location?.name;
+    if (!name) {
+      setWeatherError('地域が設定されていません');
+      return;
+    }
+    setWeatherLoading(true);
+    setWeatherError(null);
+    try {
+      const weather = await fetchWeatherApi(name);
+      setState((s) => {
+        if (!s) return s;
+        const next = { ...s, weather };
+        save(next);
+        return next;
+      });
+    } catch (e) {
+      setWeatherError(e instanceof Error ? e.message : String(e));
+    }
+    setWeatherLoading(false);
+  }, [save]);
+
   // ---- 品目のカスタマイズ ----
 
   /** リストにない品目(バスタオルなど)を追加。成功すれば true */
@@ -439,6 +473,8 @@ export function useAppState() {
     familyId,
     syncStatus,
     syncError,
+    weatherLoading,
+    weatherError,
     actions: {
       changeItem,
       changeDefault,
@@ -453,6 +489,7 @@ export function useAppState() {
       setThreshold,
       setManualWeather,
       clearWeather,
+      fetchWeather,
       addCustomItem,
       removeCustomItem,
       enableSharing,
