@@ -157,10 +157,15 @@ export function useAppState() {
     (s: AppState, date: string, fn: (b: DayBag) => DayBag): AppState =>
       mapCurrentChild(s, (c) => {
         const bag = c.bags?.[date] ?? { items: {}, confirmed: false };
-        const nextBag = fn({ items: { ...bag.items }, confirmed: bag.confirmed });
+        const nextBag = fn({
+          items: { ...bag.items },
+          confirmed: bag.confirmed,
+          notes: bag.notes ? [...bag.notes] : undefined,
+        });
         const bags = { ...c.bags };
-        // 空かつ未確定のかばんは保持しない(肥大化を避ける)
-        if (Object.keys(nextBag.items).length === 0 && !nextBag.confirmed) {
+        // 空かつ未確定かつメモなしのかばんは保持しない(肥大化を避ける)
+        const hasNotes = nextBag.notes && nextBag.notes.length > 0;
+        if (Object.keys(nextBag.items).length === 0 && !nextBag.confirmed && !hasNotes) {
           delete bags[date];
         } else {
           bags[date] = nextBag;
@@ -360,6 +365,18 @@ export function useAppState() {
       });
     },
     [save]
+  );
+
+  const changeNotes = useCallback(
+    (date: string, notes: string[]) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = mapCurrentBag(s, date, (b) => ({ ...b, notes }));
+        save(next);
+        return next;
+      });
+    },
+    [mapCurrentBag, save]
   );
 
   const copyBag = useCallback(
@@ -566,6 +583,7 @@ export function useAppState() {
       toggleConfirm,
       setLocation,
       setThreshold,
+      changeNotes,
       copyBag,
       setClosedWeekdays,
       fetchWeather,

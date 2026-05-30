@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { getBag } from '../types';
 import { ACCENT } from '../constants';
@@ -16,6 +16,7 @@ interface Props {
   onReset: (date: string, id: string) => void;
   onToggleConfirm: (date: string) => void;
   onCopyBag: (childId: string, fromDate: string, toDates: string[]) => void;
+  onChangeNotes: (date: string, notes: string[]) => void;
 }
 
 function shortDateLabel(d: string): string {
@@ -35,11 +36,19 @@ export default function ItemList({
   onReset,
   onToggleConfirm,
   onCopyBag,
+  onChangeNotes,
 }: Props) {
   const [showCopy, setShowCopy] = useState(false);
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
 
   const bag = getBag(child, date);
+
+  const [localNotes, setLocalNotes] = useState<string[]>(() => bag.notes ?? []);
+  // date/child が変わったら同期
+  useEffect(() => {
+    setLocalNotes(bag.notes ?? []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, child.id]);
   const items = bag.items;
   const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
   const confirmed = !!bag.confirmed;
@@ -47,6 +56,24 @@ export default function ItemList({
   const copyDates = Array.from({ length: 9 }, (_, i) => jstDateOffset(i - 1)).filter(
     (d) => d !== date
   );
+
+  const updateNote = (i: number, value: string) => {
+    const next = localNotes.map((n, j) => (j === i ? value : n));
+    setLocalNotes(next);
+    onChangeNotes(date, next);
+  };
+
+  const addNote = () => {
+    const next = [...localNotes, ''];
+    setLocalNotes(next);
+    onChangeNotes(date, next);
+  };
+
+  const removeNote = (i: number) => {
+    const next = localNotes.filter((_, j) => j !== i);
+    setLocalNotes(next);
+    onChangeNotes(date, next);
+  };
 
   const toggleCopyTarget = (d: string) => {
     setCopyTargets((prev) =>
@@ -174,6 +201,60 @@ export default function ItemList({
         <Check size={22} strokeWidth={3} />
         {confirmed ? `${child.name}の確定を取り消す` : `${child.name}の準備を確定する`}
       </button>
+
+      {/* その日だけのメモ */}
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
+            📝 その日だけ持っていくもの
+          </div>
+          {!confirmed && (
+            <button
+              onClick={addNote}
+              className="w-7 h-7 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 active:scale-90 transition-all"
+              aria-label="メモを追加"
+            >
+              <Plus size={14} />
+            </button>
+          )}
+        </div>
+        {localNotes.length === 0 && !confirmed && (
+          <button
+            onClick={addNote}
+            className="w-full py-3 rounded-xl border border-dashed border-stone-200 text-stone-400 text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Plus size={14} /> メモを追加
+          </button>
+        )}
+        {localNotes.length === 0 && confirmed && null}
+        <div className="space-y-2">
+          {localNotes.map((note, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => updateNote(i, e.target.value)}
+                readOnly={confirmed}
+                placeholder="書類名・持ち物など"
+                className={`flex-1 px-3 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
+                  confirmed
+                    ? 'bg-stone-50 border-stone-200 text-stone-400 cursor-default'
+                    : 'bg-white border-stone-200 text-stone-800 focus:border-stone-400'
+                }`}
+              />
+              {!confirmed && (
+                <button
+                  onClick={() => removeNote(i)}
+                  className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 active:scale-90 transition-all shrink-0"
+                  aria-label="削除"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* 他の日にコピー */}
       <div className="mt-3 mb-8">

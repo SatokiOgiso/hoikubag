@@ -115,6 +115,7 @@ export default function App() {
           onReset={actions.resetChild}
           onToggleConfirm={actions.toggleConfirm}
           onCopyBag={actions.copyBag}
+          onChangeNotes={actions.changeNotes}
         />
       </div>
 

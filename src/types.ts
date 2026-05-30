@@ -4,6 +4,7 @@ export type ChildId = string; // uid
 export interface DayBag {
   items: Record<string, number>; // 入力。例: { "おむつ": 3 }
   confirmed?: boolean; // その日の準備を確定したか
+  notes?: string[]; // その日限りのメモ(書類名など)
 }
 
 export interface Child {
