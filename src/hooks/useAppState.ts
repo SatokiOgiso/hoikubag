@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppState, Child } from '../types';
 import { DEFAULT_THRESHOLD } from '../constants';
-import { storage } from '../lib/storage';
+import {
+  createProvider,
+  getStoredFamilyId,
+  setStoredFamilyId,
+  clearStoredFamilyId,
+  generateFamilyId,
+  type StorageProvider,
+} from '../lib/storage';
 import { uid } from '../lib/date';
 
 function initialState(): AppState {
@@ -20,17 +27,23 @@ export function useAppState() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [familyId, setFamilyId] = useState<string | null>(null);
   // 競合解決用に最新の updatedAt を ref で保持(リスナーの再登録を避ける)
   const updatedAtRef = useRef(0);
+  // 現在の永続化 Provider(共有の有無で差し替わる)
+  const providerRef = useRef<StorageProvider>(createProvider(null));
 
-  // 初回ロード
+  // 初回ロード(familyId があればクラウドから取得)
   useEffect(() => {
     let active = true;
     (async () => {
-      const loaded = await storage.load();
+      const fid = getStoredFamilyId();
+      providerRef.current = createProvider(fid);
+      const loaded = await providerRef.current.load();
       const next = loaded ?? initialState();
       if (!active) return;
       updatedAtRef.current = next.updatedAt;
+      setFamilyId(fid);
       setState(next);
       setLoading(false);
     })();
@@ -39,20 +52,20 @@ export function useAppState() {
     };
   }, []);
 
-  // 保存(updatedAt を更新 → localStorage / 将来はクラウドへ)
+  // 保存(updatedAt を更新 → Provider へ)
   const save = useCallback((next: AppState) => {
     const stamped = { ...next, updatedAt: Date.now() };
     updatedAtRef.current = stamped.updatedAt;
     setState(stamped);
-    void storage.save(stamped);
+    void providerRef.current.save(stamped);
   }, []);
 
-  // 画面復帰時に再読込(将来クラウド Provider にすると即家族同期が効く)
+  // 画面復帰時に再読込(共有中はクラウドの最新を取り込む)
   useEffect(() => {
     if (loading) return;
     const onVisible = async () => {
       if (document.hidden) return;
-      const remote = await storage.load();
+      const remote = await providerRef.current.load();
       if (!remote) return;
       // 新しい方を採用(last-write-wins)
       if (remote.updatedAt > updatedAtRef.current) {
@@ -278,11 +291,48 @@ export function useAppState() {
     });
   }, [save]);
 
+  // ---- 家族共有 ----
+
+  /** 共有を開始: 新しい familyId を発行し、現在のデータをクラウドへアップロード */
+  const enableSharing = useCallback(() => {
+    setState((s) => {
+      if (!s) return s;
+      const fid = generateFamilyId();
+      setStoredFamilyId(fid);
+      providerRef.current = createProvider(fid);
+      setFamilyId(fid);
+      save(s); // 現在の状態をクラウドへ(save 内で updatedAt 更新 + アップロード)
+      showToast('家族共有を開始しました');
+      return s;
+    });
+  }, [save, showToast]);
+
+  /** 共有を停止: この端末を共有から外す(クラウドのデータは保持) */
+  const disableSharing = useCallback(() => {
+    clearStoredFamilyId();
+    providerRef.current = createProvider(null);
+    setFamilyId(null);
+    showToast('この端末の共有を停止しました');
+  }, [showToast]);
+
+  /** 今すぐクラウドの最新を取得 */
+  const syncNow = useCallback(async () => {
+    const remote = await providerRef.current.load();
+    if (remote && remote.updatedAt > updatedAtRef.current) {
+      updatedAtRef.current = remote.updatedAt;
+      setState(remote);
+      showToast('最新データに更新しました');
+    } else {
+      showToast('すでに最新です');
+    }
+  }, [showToast]);
+
   return {
     state,
     loading,
     toast,
     showToast,
+    familyId,
     actions: {
       changeItem,
       changeDefault,
@@ -297,6 +347,9 @@ export function useAppState() {
       setThreshold,
       setManualWeather,
       clearWeather,
+      enableSharing,
+      disableSharing,
+      syncNow,
     },
   };
 }

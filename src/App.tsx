@@ -9,7 +9,7 @@ import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
 export default function App() {
-  const { state, loading, toast, actions } = useAppState();
+  const { state, loading, toast, familyId, actions } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
 
   if (loading || !state) {
@@ -86,6 +86,7 @@ export default function App() {
       {showSettings && (
         <SettingsModal
           state={state}
+          familyId={familyId}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />

@@ -4,14 +4,18 @@ import { STORAGE_KEY } from '../constants';
 /**
  * 永続化の抽象レイヤ。
  *
- * v1 は LocalStorageProvider のみ。将来、家族間共有を足すときは
- * KvStorageProvider(下記コメント参照)を実装して `storage` を差し替えるだけで、
- * useAppState / 各コンポーネントは一切変更不要。
+ * - 共有なし: LocalStorageProvider(この端末内のみ)
+ * - 家族共有: KvStorageProvider(/api/state 経由で Upstash Redis に保存)
+ *
+ * 共有の有無は familyId(URL の ?f= または localStorage)で決まる。
+ * useAppState / 各コンポーネントは StorageProvider インターフェースにのみ依存する。
  */
 export interface StorageProvider {
   load(): Promise<AppState | null>;
   save(state: AppState): Promise<void>;
 }
+
+const FAMILY_ID_KEY = 'hoiku-family-id';
 
 /** 読み込んだ生データに対する後方互換マイグレーション */
 export function migrate(raw: unknown): AppState | null {
@@ -35,51 +39,128 @@ export function migrate(raw: unknown): AppState | null {
   };
 }
 
+// ---- localStorage(共有ありでもキャッシュ/オフライン用に使う)----
+function readLocal(): AppState | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? migrate(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocal(state: AppState): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // 容量超過などは無視(メモリ上の state は保持される)
+  }
+}
+
 export class LocalStorageProvider implements StorageProvider {
-  constructor(private key: string = STORAGE_KEY) {}
+  async load(): Promise<AppState | null> {
+    return readLocal();
+  }
+  async save(state: AppState): Promise<void> {
+    writeLocal(state);
+  }
+}
+
+/** 家族共有: /api/state 経由でクラウドに読み書きしつつ localStorage にキャッシュ */
+export class KvStorageProvider implements StorageProvider {
+  constructor(private familyId: string) {}
+
+  private url(): string {
+    return `/api/state?f=${encodeURIComponent(this.familyId)}`;
+  }
 
   async load(): Promise<AppState | null> {
     try {
-      const raw = localStorage.getItem(this.key);
-      if (!raw) return null;
-      return migrate(JSON.parse(raw));
+      const r = await fetch(this.url());
+      if (r.ok) {
+        const state = migrate(await r.json());
+        if (state) {
+          writeLocal(state); // キャッシュ更新
+          return state;
+        }
+      }
     } catch {
-      return null;
+      // ネットワーク不通時は下のローカルキャッシュにフォールバック
     }
+    return readLocal();
   }
 
   async save(state: AppState): Promise<void> {
+    writeLocal(state); // 即時キャッシュ
     try {
-      localStorage.setItem(this.key, JSON.stringify(state));
+      await fetch(this.url(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(state),
+      });
     } catch {
-      // 容量超過などは黙って無視(UI 側の state は保持される)
+      // オフライン時はローカルキャッシュのみ。次回の load/save で再同期される
     }
   }
 }
 
-/*
- * --- 将来の家族間共有(無料枠で完結)の実装メモ ---
- *
- * class KvStorageProvider implements StorageProvider {
- *   constructor(private familyId: string) {}
- *   async load() {
- *     const r = await fetch(`/api/state?f=${this.familyId}`);
- *     return r.ok ? migrate(await r.json()) : null;
- *   }
- *   async save(state: AppState) {
- *     await fetch(`/api/state?f=${this.familyId}`, {
- *       method: 'POST',
- *       headers: { 'Content-Type': 'application/json' },
- *       body: JSON.stringify(state),
- *     });
- *   }
- * }
- *
- * - /api/state.ts を Vercel Serverless Function として追加し、
- *   Upstash Redis(Vercel Marketplace の無料枠)に `family:<familyId>` キーで保存。
- * - familyId は URL クエリ(?f=xxxx)で家族に共有。
- * - 競合は updatedAt の大きい方を採用(last-write-wins)。
- */
+// ---- familyId 管理 ----
 
-/** v1 のデフォルト Provider */
-export const storage: StorageProvider = new LocalStorageProvider();
+/** URL の ?f= を最優先(あれば永続化)、なければ localStorage の保存値 */
+export function getStoredFamilyId(): string | null {
+  try {
+    const fromUrl = new URL(window.location.href).searchParams.get('f');
+    if (fromUrl) {
+      localStorage.setItem(FAMILY_ID_KEY, fromUrl);
+      return fromUrl;
+    }
+  } catch {
+    /* noop */
+  }
+  try {
+    return localStorage.getItem(FAMILY_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredFamilyId(id: string): void {
+  try {
+    localStorage.setItem(FAMILY_ID_KEY, id);
+  } catch {
+    /* noop */
+  }
+}
+
+export function clearStoredFamilyId(): void {
+  try {
+    localStorage.removeItem(FAMILY_ID_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
+/** 推測されにくい家族ID を生成 */
+export function generateFamilyId(): string {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID().replace(/-/g, '');
+  return (
+    Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+  );
+}
+
+/** 共有リンク(現在のURLに ?f= を付与) */
+export function shareUrlFor(familyId: string): string {
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('f', familyId);
+    return u.toString();
+  } catch {
+    return `?f=${familyId}`;
+  }
+}
+
+/** familyId の有無で適切な Provider を返す */
+export function createProvider(familyId: string | null): StorageProvider {
+  return familyId ? new KvStorageProvider(familyId) : new LocalStorageProvider();
+}

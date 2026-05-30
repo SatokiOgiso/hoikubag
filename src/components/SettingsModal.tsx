@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { X, Plus, Minus, Trash2, RefreshCw } from 'lucide-react';
+import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users } from 'lucide-react';
 import type { AppState } from '../types';
 import { ITEMS, COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD } from '../constants';
+import { shareUrlFor } from '../lib/storage';
 
 interface Props {
   state: AppState;
+  familyId: string | null;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -16,13 +18,28 @@ interface Props {
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
     resetAll: () => void;
+    enableSharing: () => void;
+    disableSharing: () => void;
+    syncNow: () => void;
   };
 }
 
 /** 設定モーダル(下から立ち上がる/デスクトップは中央) */
-export default function SettingsModal({ state, onClose, actions }: Props) {
+export default function SettingsModal({ state, familyId, onClose, actions }: Props) {
   const [citySearch, setCitySearch] = useState('');
+  const [copied, setCopied] = useState(false);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
+
+  const shareUrl = familyId ? shareUrlFor(familyId) : '';
+  const copyShareUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+    } catch {
+      /* クリップボード不可環境では手動コピーにフォールバック */
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
 
   const commitCity = () => {
     if (!citySearch.trim()) return;
@@ -251,20 +268,78 @@ export default function SettingsModal({ state, onClose, actions }: Props) {
             </button>
           </section>
 
-          {/* 家族との同期(v1 は案内のみ) */}
+          {/* 家族との同期 */}
           <section>
             <h3 className="text-sm font-bold text-stone-700 mb-2">📱 家族とのデータ同期</h3>
-            <div className="bg-white rounded-xl p-4 border border-stone-200 text-xs text-stone-600 leading-relaxed space-y-2">
-              <p>
-                現在のバージョンでは、データは
-                <span className="font-bold text-stone-800">この端末内にのみ保存</span>
-                されます。家族間でのデータ共有は今後のアップデートで対応予定です。
-              </p>
-              <p className="text-stone-500 flex items-center gap-1.5">
-                <RefreshCw size={12} />
-                同じ端末・ブラウザであれば、次回開いたときも入力内容が保持されます。
-              </p>
-            </div>
+
+            {!familyId ? (
+              <div className="space-y-2">
+                <div className="bg-white rounded-xl p-4 border border-stone-200 text-xs text-stone-600 leading-relaxed space-y-2">
+                  <p>
+                    いまは
+                    <span className="font-bold text-stone-800">この端末内にのみ保存</span>
+                    されています。共有を開始すると、リンクを知っている家族と同じデータを
+                    どの端末からでも見られるようになります。
+                  </p>
+                </div>
+                <button
+                  onClick={actions.enableSharing}
+                  className="w-full rounded-xl py-3 text-white font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+                  style={{ background: ACCENT }}
+                >
+                  <Users size={16} /> 家族と共有を開始
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="bg-white rounded-xl p-4 border border-stone-200 text-xs text-stone-600 leading-relaxed space-y-2">
+                  <p className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                    <Users size={14} /> 共有中
+                  </p>
+                  <p>
+                    下のリンクを家族に LINE などで送ってください。同じリンクを開くと、同じ
+                    データが表示・編集できます。
+                  </p>
+                </div>
+
+                {/* 共有リンク + コピー */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className="flex-1 min-w-0 bg-white rounded-xl px-3 py-2.5 border border-stone-200 text-xs text-stone-700 focus:outline-none"
+                  />
+                  <button
+                    onClick={copyShareUrl}
+                    className="shrink-0 px-3 rounded-xl text-white font-bold text-sm active:scale-95 flex items-center gap-1.5"
+                    style={{ background: ACCENT }}
+                  >
+                    {copied ? <Check size={15} /> : <Copy size={15} />}
+                    {copied ? '完了' : 'コピー'}
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={actions.syncNow}
+                    className="flex-1 bg-white rounded-xl py-2.5 border border-stone-200 text-stone-700 font-bold text-sm active:scale-95 transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw size={14} /> 今すぐ同期
+                  </button>
+                  <button
+                    onClick={actions.disableSharing}
+                    className="flex-1 bg-white rounded-xl py-2.5 border border-stone-200 text-stone-500 font-bold text-sm hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all"
+                  >
+                    共有を停止
+                  </button>
+                </div>
+                <p className="text-[10px] text-stone-400 leading-relaxed px-1">
+                  タブ復帰時に自動で最新を取り込みます。同時編集時は後から保存した内容が優先されます。
+                </p>
+              </div>
+            )}
           </section>
         </div>
       </div>
