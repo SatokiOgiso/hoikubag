@@ -33,10 +33,10 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
               <button
                 key={c.id}
                 onClick={() => onSelectChild(c.id)}
-                className={`flex w-full text-left gap-3 rounded-xl px-3 py-2.5 transition-all active:scale-[0.98] ${
+                className={`flex w-full text-left gap-3 rounded-xl px-3 py-2.5 transition-transform active:scale-[0.98] ${
                   active
                     ? 'bg-stone-800 text-white shadow-sm'
-                    : 'opacity-50 hover:opacity-75 hover:bg-stone-50'
+                    : 'text-stone-400 hover:bg-stone-50'
                 }`}
               >
                 {/* 確定マーク */}

@@ -290,12 +290,9 @@ export function useAppState() {
 
   const selectChild = useCallback(
     (id: string) => {
-      setState((s) => {
-        if (!s) return s;
-        const next = { ...s, currentChildId: id };
-        save(next);
-        return next;
-      });
+      const current = stateRef.current;
+      if (!current || current.currentChildId === id) return;
+      save({ ...current, currentChildId: id });
     },
     [save]
   );
