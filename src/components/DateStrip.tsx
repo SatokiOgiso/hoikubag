@@ -112,11 +112,11 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
                 <span className="my-0.5 h-7" />
               )}
               <span className="flex items-baseline gap-0.5 font-black leading-none">
-                <span className="text-[16px]" style={{ color: tempColor(day?.low ?? null) }}>
+                <span className="text-[17px]" style={{ color: tempColor(day?.low ?? null) }}>
                   {day?.low != null ? `${day.low}°` : '—'}
                 </span>
                 <span className="text-stone-300 text-[14px]">/</span>
-                <span className="text-[18px]" style={{ color: tempColor(day?.high ?? null) }}>
+                <span className="text-[17px]" style={{ color: tempColor(day?.high ?? null) }}>
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>

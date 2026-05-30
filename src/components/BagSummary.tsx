@@ -17,10 +17,10 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
     <div className="px-5 mb-4">
       <div className="rounded-2xl bg-white border border-stone-200 p-4 shadow-sm">
         <div className="flex items-baseline justify-between mb-3">
-          <div className="text-[10px] text-stone-500 tracking-[0.3em] font-bold">
+          <div className="text-[15px] text-stone-500 tracking-[0.3em] font-bold">
             🎒 かばんの中身
           </div>
-          <div className="text-xs text-stone-500 font-bold">{dateLabel(date)}</div>
+          <div className="text-[18px] text-stone-500 font-bold">{dateLabel(date)}</div>
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -59,13 +59,13 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                   <div className="flex items-baseline justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <div
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        className="w-2 h-2 rounded-full shrink-0"
                         style={{ background: active ? 'rgba(255,255,255,0.6)' : '#A8A29E' }}
                       />
-                      <div className="font-bold text-sm">{c.name}</div>
+                      <div className="font-bold text-[21px]">{c.name}</div>
                       {confirmed && (
                         <span
-                          className={`text-[10px] font-bold ${
+                          className={`text-[15px] font-bold ${
                             active ? 'text-emerald-400' : 'text-emerald-600'
                           }`}
                         >
@@ -73,7 +73,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                         </span>
                       )}
                     </div>
-                    <div className="text-xs font-bold">
+                    <div className="text-[18px] font-bold">
                       {cTotal > 0 ? (
                         <span>
                           {cTotal}
@@ -95,17 +95,17 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                     </div>
                   </div>
                   {(cTotal > 0 || cNotes.length > 0) && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {items
                         .filter((i) => cItems[i.key])
                         .map((i) => (
                           <div
                             key={i.key}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 ${
+                            className={`px-2.5 py-1 rounded text-[16px] font-medium flex items-center gap-1.5 ${
                               active ? 'bg-white/10' : 'bg-stone-100'
                             }`}
                           >
-                            <span className="text-sm leading-none">{i.emoji}</span>
+                            <span className="text-[18px] leading-none">{i.emoji}</span>
                             <span>{i.key}</span>
                             <span className="font-black">{cItems[i.key]}</span>
                           </div>
@@ -113,12 +113,12 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                       {cNotes.map((n, i) => (
                         <div
                           key={`note-${i}`}
-                          className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 ${
+                          className={`px-2.5 py-1 rounded text-[16px] font-medium flex items-center gap-1.5 ${
                             active ? 'bg-white/10' : 'bg-stone-100'
                           }`}
                         >
-                          <span className="text-sm leading-none">📝</span>
-                          <span className="max-w-[72px] truncate">{n}</span>
+                          <span className="text-[18px] leading-none">📝</span>
+                          <span className="max-w-[108px] truncate">{n}</span>
                         </div>
                       ))}
                     </div>
