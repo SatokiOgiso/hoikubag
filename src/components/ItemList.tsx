@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy } from 'lucide-react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { getBag } from '../types';
 import { ACCENT } from '../constants';
@@ -60,13 +60,20 @@ export default function ItemList({
         <h2 className="text-sm font-bold text-stone-700">
           持ち物 <span className="text-stone-400">· {child.name}</span>
         </h2>
-        {totalCount > 0 && (
-          <button
-            onClick={() => onReset(date, child.id)}
-            className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 active:scale-95"
-          >
-            <RefreshCw size={12} /> リセット
-          </button>
+        {confirmed ? (
+          <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
+            <Lock size={11} />
+            確定済み・編集不可
+          </div>
+        ) : (
+          totalCount > 0 && (
+            <button
+              onClick={() => onReset(date, child.id)}
+              className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 active:scale-95"
+            >
+              <RefreshCw size={12} /> リセット
+            </button>
+          )
         )}
       </div>
 
@@ -80,7 +87,11 @@ export default function ItemList({
             <div
               key={item.key}
               className={`rounded-2xl border transition-all ${
-                count > 0
+                confirmed
+                  ? count > 0
+                    ? 'bg-stone-50 border-stone-200'
+                    : 'bg-white/30 border-stone-100'
+                  : count > 0
                   ? warn
                     ? 'bg-amber-50 border-amber-300'
                     : 'bg-white border-stone-300 shadow-sm'
@@ -90,7 +101,13 @@ export default function ItemList({
               <div className="flex items-center px-3 py-2.5 gap-3">
                 <div
                   className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0 transition-all ${
-                    count > 0 ? (warn ? 'bg-amber-100' : 'bg-stone-100') : 'bg-stone-100/60'
+                    confirmed
+                      ? 'bg-stone-100/60'
+                      : count > 0
+                      ? warn
+                        ? 'bg-amber-100'
+                        : 'bg-stone-100'
+                      : 'bg-stone-100/60'
                   }`}
                 >
                   {item.emoji}
@@ -98,12 +115,12 @@ export default function ItemList({
                 <div className="flex-1 min-w-0">
                   <div
                     className={`font-bold text-base ${
-                      count > 0 ? 'text-stone-800' : 'text-stone-500'
+                      confirmed ? 'text-stone-400' : count > 0 ? 'text-stone-800' : 'text-stone-500'
                     }`}
                   >
                     {item.key}
                   </div>
-                  {warn && (
+                  {!confirmed && warn && (
                     <div className="text-xs text-amber-700 mt-0.5 flex items-center gap-1 font-medium">
                       <AlertTriangle size={11} />
                       {isHot ? '暑い予報です' : '涼しい予報です'}
@@ -113,9 +130,9 @@ export default function ItemList({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => onChangeItem(date, item.key, -1)}
-                    disabled={count === 0}
+                    disabled={confirmed || count === 0}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
-                      count === 0 ? 'bg-stone-100 text-stone-300' : 'bg-stone-100 text-stone-700'
+                      confirmed || count === 0 ? 'bg-stone-100 text-stone-300' : 'bg-stone-100 text-stone-700'
                     }`}
                     aria-label="減らす"
                   >
@@ -123,14 +140,15 @@ export default function ItemList({
                   </button>
                   <div
                     className={`w-12 text-center font-black text-2xl ${
-                      count > 0 ? 'text-stone-800' : 'text-stone-300'
+                      confirmed ? 'text-stone-300' : count > 0 ? 'text-stone-800' : 'text-stone-300'
                     }`}
                   >
                     {count}
                   </div>
                   <button
                     onClick={() => onChangeItem(date, item.key, 1)}
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all"
+                    disabled={confirmed}
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all disabled:opacity-30"
                     style={{ background: ACCENT }}
                     aria-label="増やす"
                   >
