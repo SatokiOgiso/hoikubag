@@ -5,7 +5,6 @@ import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
 import WeatherCard from './components/WeatherCard';
-import ChildTabs from './components/ChildTabs';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 
@@ -88,13 +87,6 @@ export default function App() {
           onSelectDate={setSelectedDate}
         />
 
-        <BagSummary
-          state={state}
-          items={allItems}
-          date={selectedDate}
-          onSelectChild={actions.selectChild}
-        />
-
         <WeatherCard
           locationName={state.location?.name}
           forecast={forecast}
@@ -105,9 +97,9 @@ export default function App() {
           onFetchWeather={actions.fetchWeather}
         />
 
-        <ChildTabs
-          children={state.children}
-          currentChildId={state.currentChildId}
+        <BagSummary
+          state={state}
+          items={allItems}
           date={selectedDate}
           onSelectChild={actions.selectChild}
         />

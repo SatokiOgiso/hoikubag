@@ -101,7 +101,7 @@ export default function WeatherCard({
 
         {day ? (
           <>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Icon
                 size={56}
                 strokeWidth={1.4}
@@ -122,30 +122,27 @@ export default function WeatherCard({
                   </span>
                 </div>
               </div>
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-stone-200/60">
-              {isHot && (
-                <div className="flex items-center gap-2 text-orange-700 text-sm font-bold">
-                  <AlertTriangle size={15} />
-                  暑い予報。<span className="underline">👕半袖</span>がおすすめ
+              {/* 服装アドバイスバッジ(右カラム) */}
+              {(isHot || isCool) && (
+                <div
+                  className={`shrink-0 flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-3 text-center ${
+                    isHot
+                      ? 'bg-orange-100/80 text-orange-700'
+                      : 'bg-sky-100/80 text-sky-700'
+                  }`}
+                >
+                  <AlertTriangle size={13} />
+                  <div className="text-[9px] font-bold leading-tight">
+                    {isHot ? '暑い予報' : '涼しい予報'}
+                  </div>
+                  <div className="text-xl">{isHot ? '👕' : '🧥'}</div>
+                  <div className="text-xs font-bold">{isHot ? '半袖' : '長袖'}</div>
                 </div>
-              )}
-              {isCool && (
-                <div className="flex items-center gap-2 text-sky-700 text-sm font-bold">
-                  <AlertTriangle size={15} />
-                  涼しい予報。<span className="underline">🧥長袖</span>がおすすめ
-                </div>
-              )}
-              {!isHot && !isCool && (
-                <div className="text-xs text-stone-500">
-                  この日の気温が取得できませんでした(しきい値 {threshold}°C)
-                </div>
-              )}
-              {sourceNote && (
-                <div className="text-[10px] text-stone-400 mt-1">天気: {sourceNote}</div>
               )}
             </div>
+            {sourceNote && (
+              <div className="text-[10px] text-stone-400 mt-2.5">天気: {sourceNote}</div>
+            )}
           </>
         ) : weatherLoading ? (
           <div className="py-8 text-center text-stone-400 text-sm flex items-center justify-center gap-2">
