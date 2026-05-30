@@ -2,8 +2,18 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// デプロイ識別用バージョン: Vercel のコミットSHA(短縮) + ビルド日時(JST)
+const commit = (process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev').slice(0, 7);
+const buildDate = new Date().toLocaleString('sv-SE', {
+  timeZone: 'Asia/Tokyo',
+}).slice(5, 16); // 例: 05-31 09:42
+const appVersion = `${commit} · ${buildDate}`;
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
     VitePWA({

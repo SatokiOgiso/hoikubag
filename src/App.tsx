@@ -71,8 +71,12 @@ export default function App() {
       />
 
       <div className="relative max-w-lg mx-auto">
+        {/* デプロイ識別用バージョン(最上部に小さく) */}
+        <div className="text-center text-[10px] text-stone-400/70 font-medium pt-1 tracking-wide select-none">
+          v{__APP_VERSION__}
+        </div>
         {/* ヘッダー */}
-        <header className="px-5 pt-5 pb-3">
+        <header className="px-5 pt-1 pb-3">
           <div className="flex items-center justify-between">
             {/* ロゴ */}
             <div className="flex items-center gap-2">
