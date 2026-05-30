@@ -611,6 +611,41 @@ export function useAppState() {
     });
   }, [save, showToast]);
 
+  /** 既存の共有に参加: 招待URL または familyId を受け取り、クラウドのデータをロード */
+  const joinFamily = useCallback(async (input: string): Promise<boolean> => {
+    let fid = input.trim();
+    try {
+      const u = new URL(fid);
+      fid = u.searchParams.get('f') ?? fid;
+    } catch {
+      // URLでなければそのまま familyId として扱う
+    }
+    if (!/^[A-Za-z0-9_-]{6,64}$/.test(fid)) {
+      showToast('招待コードが正しくありません');
+      return false;
+    }
+    const provider = new KvStorageProvider(fid);
+    try {
+      const remote = await provider.load();
+      if (!remote) {
+        showToast('データが見つかりませんでした');
+        return false;
+      }
+      setStoredFamilyId(fid);
+      providerRef.current = provider;
+      setFamilyId(fid);
+      updatedAtRef.current = remote.updatedAt;
+      setState(remote);
+      markSynced();
+      showToast('家族の共有データに接続しました');
+      return true;
+    } catch (e) {
+      markSyncError(e);
+      showToast('接続に失敗しました');
+      return false;
+    }
+  }, [showToast]);
+
   /** 共有を停止: この端末を共有から外す(クラウドのデータは保持) */
   const disableSharing = useCallback(() => {
     clearStoredFamilyId();
@@ -676,6 +711,7 @@ export function useAppState() {
       updateRecurringItem,
       removeRecurringItem,
       enableSharing,
+      joinFamily,
       disableSharing,
       syncNow,
     },
