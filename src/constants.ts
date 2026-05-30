@@ -31,5 +31,6 @@ export const ITEM_EMOJI_CHOICES = [
 
 export const STORAGE_KEY = 'hoiku-prep-v1';
 export const DEFAULT_THRESHOLD = 23; // 袖の警告基準温度(°C)
+export const DEFAULT_CLOSED_WEEKDAYS = [0, 6]; // 日曜(0)・土曜(6)
 export const ACCENT = '#D86B4A'; // メインカラー
 export const BG = '#FAF5EA'; // 背景色

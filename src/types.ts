@@ -45,6 +45,7 @@ export interface AppState {
   location: Location;
   thresholdTemp: number; // デフォルト 23
   customItems: Item[]; // ユーザーが追加した品目(バスタオルなど)
+  closedWeekdays: number[]; // 保育園のない曜日 0=日..6=土, デフォルト [0,6]
   updatedAt: number; // 競合解決用タイムスタンプ
 }
 
