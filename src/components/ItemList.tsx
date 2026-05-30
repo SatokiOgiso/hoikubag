@@ -24,7 +24,7 @@ function shortDateLabel(d: string): string {
   return `${Number(mm)}/${Number(dd)}(${jstWeekday(d)})`;
 }
 
-/** 持ち物リスト(標準 + 追加品目・+/-ボタン・袖警告・選択日) */
+/** 持ち物リスト(標準 + 追加品目 + その日限りのメモ) */
 export default function ItemList({
   child,
   date,
@@ -42,16 +42,15 @@ export default function ItemList({
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
 
   const bag = getBag(child, date);
+  const items = bag.items;
+  const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
+  const confirmed = !!bag.confirmed;
 
   const [localNotes, setLocalNotes] = useState<string[]>(() => bag.notes ?? []);
-  // date/child が変わったら同期
   useEffect(() => {
     setLocalNotes(bag.notes ?? []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, child.id]);
-  const items = bag.items;
-  const totalCount = Object.values(items).reduce((a, b) => a + b, 0);
-  const confirmed = !!bag.confirmed;
 
   const copyDates = Array.from({ length: 9 }, (_, i) => jstDateOffset(i - 1)).filter(
     (d) => d !== date
@@ -105,6 +104,7 @@ export default function ItemList({
       </div>
 
       <div className="space-y-2">
+        {/* 通常アイテム */}
         {itemDefs.map((item) => {
           const count = items[item.key] || 0;
           const warn =
@@ -159,7 +159,9 @@ export default function ItemList({
                     onClick={() => onChangeItem(date, item.key, -1)}
                     disabled={confirmed || count === 0}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
-                      confirmed || count === 0 ? 'bg-stone-100 text-stone-300' : 'bg-stone-100 text-stone-700'
+                      confirmed || count === 0
+                        ? 'bg-stone-100 text-stone-300'
+                        : 'bg-stone-100 text-stone-700'
                     }`}
                     aria-label="減らす"
                   >
@@ -186,6 +188,67 @@ export default function ItemList({
             </div>
           );
         })}
+
+        {/* その日だけの持ち物(テキスト入力行) */}
+        {localNotes.map((note, i) => (
+          <div
+            key={`note-${i}`}
+            className={`rounded-2xl border transition-all ${
+              confirmed
+                ? note.trim()
+                  ? 'bg-stone-50 border-stone-200'
+                  : 'bg-white/30 border-stone-100'
+                : note.trim()
+                ? 'bg-white border-stone-300 shadow-sm'
+                : 'bg-white/50 border-stone-200'
+            }`}
+          >
+            <div className="flex items-center px-3 py-2.5 gap-3">
+              <div
+                className={`w-11 h-11 rounded-xl flex items-center justify-center text-2xl shrink-0 ${
+                  confirmed ? 'bg-stone-100/60' : note.trim() ? 'bg-stone-100' : 'bg-stone-100/60'
+                }`}
+              >
+                📝
+              </div>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => updateNote(i, e.target.value)}
+                readOnly={confirmed}
+                placeholder="書類名・持ち物など"
+                className={`flex-1 font-bold text-base bg-transparent outline-none min-w-0 ${
+                  confirmed
+                    ? note.trim()
+                      ? 'text-stone-400'
+                      : 'text-stone-300'
+                    : note.trim()
+                    ? 'text-stone-800'
+                    : 'placeholder:text-stone-300 text-stone-800'
+                }`}
+              />
+              {!confirmed && (
+                <button
+                  onClick={() => removeNote(i)}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center bg-stone-100 text-stone-400 active:scale-90 transition-all shrink-0"
+                  aria-label="削除"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* メモ追加ボタン */}
+        {!confirmed && (
+          <button
+            onClick={addNote}
+            className="w-full py-3 rounded-2xl border border-dashed border-stone-200 text-stone-400 text-sm font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Plus size={14} /> その日だけの持ち物を追加
+          </button>
+        )}
       </div>
 
       {/* 確定ボタン */}
@@ -201,60 +264,6 @@ export default function ItemList({
         <Check size={22} strokeWidth={3} />
         {confirmed ? `${child.name}の確定を取り消す` : `${child.name}の準備を確定する`}
       </button>
-
-      {/* その日だけのメモ */}
-      <div className="mt-4">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <div className="text-xs font-bold text-stone-500 flex items-center gap-1.5">
-            📝 その日だけ持っていくもの
-          </div>
-          {!confirmed && (
-            <button
-              onClick={addNote}
-              className="w-7 h-7 rounded-lg bg-stone-100 flex items-center justify-center text-stone-600 active:scale-90 transition-all"
-              aria-label="メモを追加"
-            >
-              <Plus size={14} />
-            </button>
-          )}
-        </div>
-        {localNotes.length === 0 && !confirmed && (
-          <button
-            onClick={addNote}
-            className="w-full py-3 rounded-xl border border-dashed border-stone-200 text-stone-400 text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-          >
-            <Plus size={14} /> メモを追加
-          </button>
-        )}
-        {localNotes.length === 0 && confirmed && null}
-        <div className="space-y-2">
-          {localNotes.map((note, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => updateNote(i, e.target.value)}
-                readOnly={confirmed}
-                placeholder="書類名・持ち物など"
-                className={`flex-1 px-3 py-2.5 rounded-xl border text-sm font-medium outline-none transition-all ${
-                  confirmed
-                    ? 'bg-stone-50 border-stone-200 text-stone-400 cursor-default'
-                    : 'bg-white border-stone-200 text-stone-800 focus:border-stone-400'
-                }`}
-              />
-              {!confirmed && (
-                <button
-                  onClick={() => removeNote(i)}
-                  className="w-8 h-8 rounded-lg bg-stone-100 flex items-center justify-center text-stone-400 active:scale-90 transition-all shrink-0"
-                  aria-label="削除"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* 他の日にコピー */}
       <div className="mt-3 mb-8">

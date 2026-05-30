@@ -27,6 +27,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             const bag = getBag(c, date);
             const cItems = bag.items;
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
+            const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
             const active = c.id === state.currentChildId;
             const confirmed = !!bag.confirmed;
             return (
@@ -81,6 +82,10 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                             点
                           </span>
                         </span>
+                      ) : cNotes.length > 0 ? (
+                        <span className={active ? 'text-white/70' : 'text-stone-500'}>
+                          メモ{cNotes.length}件
+                        </span>
                       ) : (
                         <span className={active ? 'text-white/40' : 'text-stone-400'}>
                           未入力
@@ -88,7 +93,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                       )}
                     </div>
                   </div>
-                  {cTotal > 0 && (
+                  {(cTotal > 0 || cNotes.length > 0) && (
                     <div className="flex flex-wrap gap-1">
                       {items
                         .filter((i) => cItems[i.key])
@@ -104,6 +109,17 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                             <span className="font-black">{cItems[i.key]}</span>
                           </div>
                         ))}
+                      {cNotes.map((n, i) => (
+                        <div
+                          key={`note-${i}`}
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1 ${
+                            active ? 'bg-white/10' : 'bg-stone-100'
+                          }`}
+                        >
+                          <span className="text-sm leading-none">📝</span>
+                          <span className="max-w-[72px] truncate">{n}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
