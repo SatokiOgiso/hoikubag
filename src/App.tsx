@@ -71,8 +71,12 @@ export default function App() {
       />
 
       <div className="relative max-w-lg mx-auto">
+        {/* デプロイ識別用バージョン(最上部に小さく) */}
+        <div className="text-center text-[10px] text-stone-400/70 font-medium pt-1 tracking-wide select-none">
+          v{__APP_VERSION__}
+        </div>
         {/* ヘッダー */}
-        <header className="px-5 pt-5 pb-3">
+        <header className="px-5 pt-1 pb-3">
           <div className="flex items-center justify-between">
             {/* ロゴ */}
             <div className="flex items-center gap-2">
@@ -169,8 +173,16 @@ export default function App() {
 
       {/* トースト */}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white px-5 py-3 rounded-2xl shadow-lg z-50 font-bold text-sm">
-          {toast}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white pl-5 pr-2 py-2 rounded-2xl shadow-lg z-50 font-bold text-sm flex items-center gap-3 max-w-[calc(100vw-2rem)]">
+          <span className="py-1">{toast.message}</span>
+          {toast.undo && (
+            <button
+              onClick={toast.undo}
+              className="shrink-0 px-3 py-1.5 rounded-xl bg-white/15 text-white font-bold active:scale-95 transition-all"
+            >
+              元に戻す
+            </button>
+          )}
         </div>
       )}
       <Analytics />
