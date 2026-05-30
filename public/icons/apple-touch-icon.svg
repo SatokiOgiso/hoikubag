@@ -1,0 +1,19 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="180" height="180" fill="#FAF5EA"/>
+  <g transform="translate(30 32) scale(1.2)">
+    <!-- ハンドル -->
+    <path d="M38 22 Q38 12 50 12 Q62 12 62 22" stroke="#D4A017" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <!-- 本体 -->
+    <rect x="14" y="24" width="72" height="54" rx="16" fill="#F5C518"/>
+    <!-- ポケット仕切り線 -->
+    <path d="M14 56 Q50 62 86 56" stroke="#D4A017" stroke-width="3.5" fill="none"/>
+    <!-- 服(青) -->
+    <ellipse cx="40" cy="44" rx="12" ry="10" fill="#A8C4DC" opacity="0.9"/>
+    <!-- 服(緑) -->
+    <ellipse cx="54" cy="46" rx="14" ry="11" fill="#A8D4A8" opacity="0.9"/>
+    <!-- サイドポケット左 -->
+    <rect x="6" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+    <!-- サイドポケット右 -->
+    <rect x="82" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
+  </g>
+</svg>
