@@ -68,6 +68,7 @@ export default function SettingsModal({
   const [recMonthlyDay, setRecMonthlyDay] = useState(1);
   const [recMonthlyNth, setRecMonthlyNth] = useState(1);
   const [recMonthlyWeekday, setRecMonthlyWeekday] = useState(1);
+  const [recStartDate, setRecStartDate] = useState('');
 
   const recChild = state.children.find((c) => c.id === recChildId) ?? state.children[0];
 
@@ -81,6 +82,7 @@ export default function SettingsModal({
     setRecMonthlyDay(1);
     setRecMonthlyNth(1);
     setRecMonthlyWeekday(1);
+    setRecStartDate('');
   };
 
   const handleAddRecurring = () => {
@@ -92,7 +94,8 @@ export default function SettingsModal({
             type: 'weekly',
             weekdays: recWeekdays,
             interval: recInterval,
-            ...(recInterval > 1 ? { anchorDate: jstDateOffset(0) } : {}),
+            ...(recInterval > 1 ? { anchorDate: recStartDate || jstDateOffset(0) } : {}),
+            ...(recStartDate ? { startDate: recStartDate } : {}),
           }
         : {
             itemKey: recItemKey,
@@ -102,6 +105,7 @@ export default function SettingsModal({
               recMonthlyKind === 'dayOfMonth'
                 ? { kind: 'dayOfMonth', day: recMonthlyDay }
                 : { kind: 'nthWeekday', nth: recMonthlyNth, weekday: recMonthlyWeekday },
+            ...(recStartDate ? { startDate: recStartDate } : {}),
           };
     if (actions.addRecurringItem(recChildId, rule)) {
       setShowAddRecurring(false);
@@ -618,6 +622,20 @@ export default function SettingsModal({
                     )}
                   </>
                 )}
+
+                {/* 開始日 */}
+                <div>
+                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">開始日</div>
+                  <input
+                    type="date"
+                    value={recStartDate}
+                    onChange={(e) => setRecStartDate(e.target.value)}
+                    className="w-full bg-stone-50 rounded-lg px-3 py-2 border border-stone-200 text-sm text-stone-800 focus:outline-none focus:border-stone-400"
+                  />
+                  <div className="text-[10px] text-stone-400 mt-1">
+                    空欄の場合は今日から適用されます
+                  </div>
+                </div>
 
                 {/* アクションボタン */}
                 <div className="flex gap-2 pt-1">
