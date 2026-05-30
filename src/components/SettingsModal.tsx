@@ -396,25 +396,16 @@ export default function SettingsModal({
               </button>
             ) : (
               <div className="bg-white rounded-xl border border-stone-200 p-3 space-y-3">
-                {/* 品目選択 */}
+                {/* 品目入力 */}
                 <div>
-                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">品目</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {items.map((item) => (
-                      <button
-                        key={item.key}
-                        onClick={() => setRecItemKey(item.key)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 ${
-                          recItemKey === item.key
-                            ? 'bg-stone-800 text-white'
-                            : 'bg-stone-100 text-stone-600'
-                        }`}
-                      >
-                        <span>{item.emoji}</span>
-                        <span>{item.key}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <div className="text-[11px] font-bold text-stone-500 mb-1.5">品目名</div>
+                  <input
+                    type="text"
+                    value={recItemKey}
+                    onChange={(e) => setRecItemKey(e.target.value)}
+                    placeholder="例: 絵本バッグ、体操着"
+                    className="w-full bg-stone-50 rounded-lg px-3 py-2 border border-stone-200 text-sm text-stone-800 focus:outline-none focus:border-stone-400"
+                  />
                 </div>
 
                 {/* 個数 */}
