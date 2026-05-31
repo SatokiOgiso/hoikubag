@@ -56,6 +56,8 @@ export function useAppState() {
   const updatedAtRef = useRef(0);
   // 非同期処理から最新の state を参照するための ref
   const stateRef = useRef<AppState | null>(null);
+  // 画面復帰時の日付またぎ検知用に、最後に見た JST の「今日」を保持
+  const todayRef = useRef<string>(jstDateOffset(0));
   // 現在の永続化 Provider(共有の有無で差し替わる)
   const providerRef = useRef<StorageProvider>(createProvider(null));
 
@@ -119,6 +121,14 @@ export function useAppState() {
     if (loading) return;
     const onVisible = async () => {
       if (document.hidden) return;
+      // 日付をまたいでいたら天気を取り直し、選択日が過去なら次の登園日へ進める
+      const nowToday = jstDateOffset(0);
+      if (nowToday !== todayRef.current) {
+        todayRef.current = nowToday;
+        void fetchWeather();
+        const closed = stateRef.current?.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
+        setSelectedDate((prev) => (prev < nowToday ? nextDaycareDay(closed) : prev));
+      }
       const cloud = providerRef.current instanceof KvStorageProvider;
       try {
         const remote = await providerRef.current.load();
