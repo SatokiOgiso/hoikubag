@@ -688,6 +688,33 @@ export function useAppState() {
     }
   }, [showToast]);
 
+  // ---- オンボーディング ----
+
+  /** 初回設定をまとめて反映(子どもの名前・地域・デフォルト持ち物を1回で保存) */
+  const applyOnboarding = useCallback(
+    (data: { childNames: string[]; location: string; defaults: Record<string, number> }) => {
+      const prev = stateRef.current;
+      if (!prev) return;
+      const names = data.childNames.map((n) => n.trim()).filter(Boolean);
+      const finalNames = names.length > 0 ? names : prev.children.map((c) => c.name);
+      // 既存の子ども(id)はできるだけ再利用し、足りない分は新規作成
+      const children: Child[] = finalNames.map((name, i) => {
+        const existing = prev.children[i];
+        return existing
+          ? { ...existing, name, defaults: { ...data.defaults } }
+          : { id: uid(), name, bags: {}, defaults: { ...data.defaults } };
+      });
+      const next: AppState = {
+        ...prev,
+        children,
+        currentChildId: children[0].id,
+        location: { name: data.location.trim() || prev.location.name },
+      };
+      save(next);
+    },
+    [save]
+  );
+
   return {
     state,
     loading,
@@ -727,6 +754,7 @@ export function useAppState() {
       joinFamily,
       disableSharing,
       syncNow,
+      applyOnboarding,
     },
   };
 }
