@@ -49,7 +49,7 @@ export default function ItemList({
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
   const [confirmResetAll, setConfirmResetAll] = useState(false);
 
-  const effectiveCounts = effectiveItems(child, date);
+  const effectiveCounts = effectiveItems(child, date, closedWeekdays);
   const recKeys = recurringKeys(child, date);
   const totalCount = Object.values(effectiveCounts).reduce((a, b) => a + b, 0);
   const confirmed = !!(child.bags?.[date]?.confirmed);

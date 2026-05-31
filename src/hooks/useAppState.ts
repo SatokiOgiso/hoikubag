@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppState, Child, Item, RecurringItem } from '../types';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from '../constants';
-import { matchesRecurring } from '../lib/recurring';
+import { matchesRecurring, appliesDefaults } from '../lib/recurring';
 import {
   createProvider,
   getStoredFamilyId,
@@ -217,12 +217,16 @@ export function useAppState() {
         const hasRecurring = (currentChild?.recurringItems ?? []).some(
           (r) => r.itemKey === key && matchesRecurring(r, date)
         );
+        // この日にデフォルトが下敷きとして効く項目か(今日以降の登園日 かつ defaults に含む)
+        const hasDefault =
+          (currentChild?.defaults?.[key] ?? 0) > 0 &&
+          appliesDefaults(date, s.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS);
         const next = mapCurrentBag(s, date, (b) => {
           const items = { ...b.items };
           const current = effectiveBase !== undefined ? effectiveBase : (items[key] || 0);
           const v = Math.max(0, current + delta);
-          if (v === 0 && hasRecurring) {
-            // 定期品目を明示的にゼロにするセンチネル(定期ルールが上書きされないようにする)
+          if (v === 0 && (hasRecurring || hasDefault)) {
+            // 定期/デフォルト品目を明示的にゼロにするセンチネル(下敷きが復活しないようにする)
             items[key] = 0;
           } else if (v === 0) {
             delete items[key];

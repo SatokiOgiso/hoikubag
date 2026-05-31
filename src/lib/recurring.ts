@@ -1,6 +1,6 @@
 import type { Child, RecurringItem, Item } from '../types';
 import { getBag } from '../types';
-import { jstWeekdayNum } from './date';
+import { jstWeekdayNum, jstDateOffset } from './date';
 
 export function matchesRecurring(rule: RecurringItem, isoDate: string): boolean {
   if (rule.startDate && isoDate < rule.startDate) return false;
@@ -52,24 +52,48 @@ export function matchesRecurring(rule: RecurringItem, isoDate: string): boolean 
 }
 
 /**
- * 定期ルール + bag.items をマージした品目カウントを返す。
- * bag.items の値がルールを上書きする。bag.items[key]=0 は「ユーザーが明示的にゼロにした」を意味する。
+ * その日が「デフォルトを自動適用する対象日」か。
+ * 今日以降(過去日は履歴として尊重)かつ登園日(休園日でない)に適用する。
  */
-export function effectiveItems(child: Child, date: string): Record<string, number> {
+export function appliesDefaults(date: string, closedWeekdays: number[]): boolean {
+  if (date < jstDateOffset(0)) return false; // 過去日は対象外
+  if (closedWeekdays.includes(jstWeekdayNum(date))) return false; // 休園日は対象外
+  return true;
+}
+
+/**
+ * 表示する品目カウントを返す。優先順位は ユーザー編集(bag.items) > 定期ルール > デフォルト。
+ * closedWeekdays を渡すと、今日以降の登園日には未編集の項目にデフォルトを下敷きとして適用する。
+ * bag.items の値がルール/デフォルトを上書きする。bag.items[key]=0 は「ユーザーが明示的にゼロにした」を意味する。
+ */
+export function effectiveItems(
+  child: Child,
+  date: string,
+  closedWeekdays?: number[]
+): Record<string, number> {
   const bag = getBag(child, date);
   const merged: Record<string, number> = {};
 
+  // 最下層: デフォルト(今日以降の登園日のみ)
+  if (closedWeekdays && appliesDefaults(date, closedWeekdays)) {
+    for (const [k, v] of Object.entries(child.defaults ?? {})) {
+      if (v > 0) merged[k] = v;
+    }
+  }
+
+  // 中間層: 定期ルール
   for (const rule of child.recurringItems ?? []) {
     if (matchesRecurring(rule, date)) {
       merged[rule.itemKey] = rule.qty;
     }
   }
 
+  // 最上層: その日のユーザー編集
   for (const [k, v] of Object.entries(bag.items)) {
     merged[k] = v;
   }
 
-  // 0 は表示しない(ユーザーが定期品目を明示的にゼロにした場合など)
+  // 0 は表示しない(ユーザーが品目を明示的にゼロにした場合など)
   for (const k of Object.keys(merged)) {
     if (merged[k] === 0) delete merged[k];
   }

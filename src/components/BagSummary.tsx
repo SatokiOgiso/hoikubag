@@ -26,7 +26,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
         <div className="flex flex-col gap-1.5">
           {state.children.map((c) => {
             const bag = getBag(c, date);
-            const cItems = effectiveItems(c, date);
+            const cItems = effectiveItems(c, date, state.closedWeekdays);
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
             const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
             const active = c.id === state.currentChildId;
