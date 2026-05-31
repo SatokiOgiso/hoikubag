@@ -283,6 +283,22 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
   const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
   const omOf = (date: string) => omDays.find((d) => d.date === date) ?? null;
 
+  // 気象庁を優先しつつ、欠けたフィールド(気温/天気)だけ Open-Meteo で補完する。
+  // 夜間は気象庁の当日気温が "" になり気温だけ欠けることがあるため、日まるごとでなく
+  // フィールド単位でマージしないと「今日の気温が出ない」状態になる。
+  const mergeDay = (date: string, jma: DayForecast | null): DayForecast | null => {
+    const om = omOf(date);
+    if (!hasData(jma)) return om;
+    if (!om) return jma;
+    return {
+      date,
+      high: jma.high ?? om.high,
+      low: jma.low ?? om.low,
+      label: jma.label || om.label,
+      reliability: jma.reliability ?? null,
+    };
+  };
+
   let today: DayForecast | null = null;
   let tomorrow: DayForecast | null = null;
   let weeklyDays: DayForecast[] = [];
@@ -292,10 +308,10 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
     weeklyDays = parseJmaWeeklyDays(jmaRes.value);
   }
 
-  // 今日・明日が気象庁で取れたか(取れなければ Open-Meteo で補完)
+  // 今日・明日: 気象庁を主にしつつ欠けたフィールドを Open-Meteo で補う
   const jmaTomorrow = hasData(tomorrow);
-  if (!hasData(today)) today = omOf(tId);
-  if (!hasData(tomorrow)) tomorrow = omOf(mId);
+  today = mergeDay(tId, today);
+  tomorrow = mergeDay(mId, tomorrow);
 
   // 昨日は常に Open-Meteo
   const yesterday = omOf(yId);
