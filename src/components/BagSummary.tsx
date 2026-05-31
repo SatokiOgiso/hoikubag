@@ -1,7 +1,7 @@
-import { Check } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
 import type { AppState, Item } from '../types';
 import { getBag } from '../types';
-import { dateLabel } from '../lib/date';
+import { dateLabel, relativeEditedAt } from '../lib/date';
 import { effectiveItems } from '../lib/recurring';
 
 interface Props {
@@ -31,6 +31,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
             const active = c.id === state.currentChildId;
             const confirmed = !!bag.confirmed;
+            const editedLabel = relativeEditedAt(c.itemsUpdatedAt);
             return (
               <button
                 key={c.id}
@@ -129,6 +130,16 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                           <span className="max-w-[108px] truncate">{n}</span>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {editedLabel && (
+                    <div
+                      className={`flex items-center gap-1 mt-1.5 text-[11px] ${
+                        active ? 'text-white/40' : 'text-stone-400'
+                      }`}
+                    >
+                      <Clock size={10} />
+                      <span>最終編集 {editedLabel}</span>
                     </div>
                   )}
                 </div>

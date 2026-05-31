@@ -41,6 +41,7 @@ export function migrate(raw: unknown): AppState | null {
       bags,
       defaults: c.defaults || {},
       recurringItems: Array.isArray(c.recurringItems) ? c.recurringItems : undefined,
+      itemsUpdatedAt: typeof c.itemsUpdatedAt === 'number' ? c.itemsUpdatedAt : undefined,
     };
   });
 
