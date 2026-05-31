@@ -61,7 +61,207 @@ function lookup<T>(table: Record<string, T>, name: string): T | null {
 }
 
 export const resolveAreaCode = (name: string): string | null => lookup(JMA_OFFICES, name);
-export const resolveCoords = (name: string): [number, number] | null => lookup(PREF_COORDS, name);
+
+// ---- 気象庁の予報区マッピング(area.json) ----
+
+/**
+ * 気象庁の地域階層表 area.json。
+ *   centers  : 地方(東北・関東甲信 など)
+ *   offices  : 府県予報区(forecast の単位。例 130000=東京都)
+ *   class10s : 一次細分区域(予報区。例 130010=東京地方)  ← 天気・週間予報の単位
+ *   class15s : 二次細分区域
+ *   class20s : 市町村等                                 ← ユーザー入力の最小単位
+ * 各エントリは name と parent を持ち、下位→上位を parent で辿れる。
+ */
+interface JmaArea {
+  name: string;
+  enName?: string;
+  parent?: string;
+  children?: string[];
+}
+interface JmaAreaTable {
+  offices: Record<string, JmaArea>;
+  class10s: Record<string, JmaArea>;
+  class15s: Record<string, JmaArea>;
+  class20s: Record<string, JmaArea>;
+}
+let areaTableCache: JmaAreaTable | null = null;
+
+async function fetchAreaTable(): Promise<JmaAreaTable> {
+  if (areaTableCache) return areaTableCache;
+  const r = await fetch('https://www.jma.go.jp/bosai/common/const/area.json');
+  if (!r.ok) throw new Error(`気象庁エリア表エラー (HTTP ${r.status})`);
+  areaTableCache = (await r.json()) as JmaAreaTable;
+  return areaTableCache;
+}
+
+/** 気象庁の予報区解決結果 */
+export interface JmaArea解決 {
+  officeCode: string; // forecast.json を引くコード(府県予報区)
+  class10Code: string | null; // 一次細分区域(天気の予報区)。areas 選択に使う
+  officeName: string | null; // 府県予報区名(例: "東京都")
+  class10Name: string | null; // 予報区名(例: "東京地方")
+}
+
+/** class10 の親を辿って office コードを得る(class10 の親が center の地域もあるため office 表で照合) */
+function officeOfClass10(table: JmaAreaTable, class10Code: string): string | null {
+  // class10.parent は office(府県予報区)を指す
+  const c10 = table.class10s[class10Code];
+  if (c10?.parent && table.offices[c10.parent]) return c10.parent;
+  return null;
+}
+
+/**
+ * 地名(市区町村・地域名・都道府県)から気象庁の予報区を解決する。
+ * 市区町村(class20) → class15 → class10 と親を辿り、天気の予報区(class10)と
+ * forecast を引く office を得る。完全一致を優先し、無ければ部分一致で探す。
+ */
+async function resolveJmaArea(name: string, prefecture: string | null): Promise<JmaArea解決 | null> {
+  const n = (name || '').trim();
+  let table: JmaAreaTable;
+  try {
+    table = await fetchAreaTable();
+  } catch {
+    // エリア表が取れなければ従来どおり都道府県 office のみ
+    const code = prefecture ? resolveAreaCode(prefecture) : resolveAreaCode(n);
+    return code
+      ? { officeCode: code, class10Code: null, officeName: prefecture ?? null, class10Name: null }
+      : null;
+  }
+
+  // class20(市町村)から完全一致 → 部分一致で探し、class10 まで親を辿る
+  const findClass10FromName = (): string | null => {
+    const tryMatch = (
+      tbl: Record<string, JmaArea>,
+      matcher: (nm: string) => boolean
+    ): string | null => {
+      for (const [code, a] of Object.entries(tbl)) {
+        if (matcher(a.name)) return code;
+      }
+      return null;
+    };
+    const exact = (nm: string) => nm === n;
+    const partial = (nm: string) => n.includes(nm) || nm.includes(n);
+
+    // class20 → 親(class15) → 親(class10)
+    for (const matcher of [exact, partial]) {
+      const c20 = tryMatch(table.class20s, matcher);
+      if (c20) {
+        const c15 = table.class20s[c20]?.parent;
+        const c10 = c15 ? table.class15s[c15]?.parent : null;
+        if (c10 && table.class10s[c10]) return c10;
+      }
+    }
+    // class10 名そのものに一致(例: "東京地方"、地域名)
+    for (const matcher of [exact, partial]) {
+      const c10 = tryMatch(table.class10s, matcher);
+      if (c10) return c10;
+    }
+    return null;
+  };
+
+  const class10Code = findClass10FromName();
+  if (class10Code) {
+    const office = officeOfClass10(table, class10Code);
+    if (office) {
+      return {
+        officeCode: office,
+        class10Code,
+        officeName: table.offices[office]?.name ?? null,
+        class10Name: table.class10s[class10Code]?.name ?? null,
+      };
+    }
+  }
+
+  // 市区町村が特定できない場合は都道府県 office にフォールバック(class10 は先頭=代表区)
+  const office = prefecture ? resolveAreaCode(prefecture) : resolveAreaCode(n);
+  if (office) {
+    // その office に属する class10 の先頭を代表として使う
+    const firstClass10 =
+      Object.entries(table.class10s).find(([, a]) => a.parent === office)?.[0] ?? null;
+    return {
+      officeCode: office,
+      class10Code: firstClass10,
+      officeName: table.offices[office]?.name ?? prefecture ?? null,
+      class10Name: firstClass10 ? table.class10s[firstClass10]?.name ?? null : null,
+    };
+  }
+  return null;
+}
+
+
+/** ジオコーディングで解決した地点。prefecture は気象庁の予報区/office 解決に使う */
+export interface ResolvedLocation {
+  lat: number;
+  lon: number;
+  prefecture: string | null; // 例: "東京都"(気象庁office 解決用)。不明なら null
+}
+
+const geocodeCache = new Map<string, ResolvedLocation | null>();
+
+/** Open-Meteo Geocoding で市町村名 → 緯度経度 + 都道府県(admin1) を解決 */
+async function geocode(name: string): Promise<ResolvedLocation | null> {
+  const q = encodeURIComponent(name.trim());
+  const url =
+    `https://geocoding-api.open-meteo.com/v1/search?name=${q}` +
+    `&count=1&language=ja&format=json&countryCode=JP`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`ジオコーディング応答エラー (HTTP ${r.status})`);
+  const json = (await r.json()) as {
+    results?: { latitude: number; longitude: number; admin1?: string; country_code?: string }[];
+  };
+  const hit = json.results?.[0];
+  if (!hit) return null;
+  // admin1 が都道府県名(例: "東京都")。気象庁office表に合う形に正規化
+  const pref = hit.admin1 ? normalizePrefecture(hit.admin1) : null;
+  return { lat: hit.latitude, lon: hit.longitude, prefecture: pref };
+}
+
+/** admin1 文字列を JMA_OFFICES のキー(都道府県名)に合わせる */
+function normalizePrefecture(admin1: string): string | null {
+  const a = admin1.trim();
+  if (JMA_OFFICES[a]) return a;
+  // "Tokyo" 等の英名や表記ゆれに備え、部分一致で都道府県キーを探す
+  for (const key of Object.keys(JMA_OFFICES)) {
+    if (a.includes(key) || key.includes(a)) return key;
+  }
+  return null;
+}
+
+/**
+ * 地名(都道府県 or 市町村)を緯度経度+都道府県へ解決する。
+ * 都道府県名そのものはテーブル即引き(API不要)。市町村等はジオコーディング。
+ * 解決できない場合も、都道府県の部分一致でフォールバックする。
+ */
+export async function resolveLocation(name: string): Promise<ResolvedLocation> {
+  const n = (name || '').trim();
+  // 1. 都道府県名そのもの → テーブル即引き(高速・APIコールなし)
+  if (JMA_OFFICES[n] && PREF_COORDS[n]) {
+    return { lat: PREF_COORDS[n][0], lon: PREF_COORDS[n][1], prefecture: n };
+  }
+  // 2. ジオコーディング(キャッシュ)
+  if (geocodeCache.has(n)) {
+    const cached = geocodeCache.get(n) ?? null;
+    if (cached) return cached;
+  } else {
+    try {
+      const geo = await geocode(n);
+      geocodeCache.set(n, geo);
+      if (geo) return geo;
+    } catch {
+      geocodeCache.set(n, null); // 失敗もキャッシュして連打を避ける
+    }
+  }
+  // 3. フォールバック: 都道府県テーブルへの部分一致
+  const pref = (() => {
+    for (const key of Object.keys(PREF_COORDS)) if (n.includes(key)) return key;
+    return null;
+  })();
+  if (pref) {
+    return { lat: PREF_COORDS[pref][0], lon: PREF_COORDS[pref][1], prefecture: pref };
+  }
+  throw new Error('地域を特定できませんでした');
+}
 
 function toTemp(v: unknown): number | null {
   if (v == null) return null;
@@ -122,8 +322,21 @@ function jmaCodeToLabel(code: string | number | null | undefined): string {
   return JMA_WEEK_CODES[n] ?? '';
 }
 
+/**
+ * timeSeries の areas から、予報区コード(class10)に一致する要素の index を返す。
+ * 一致しなければ 0(府県予報区の代表区)にフォールバック。
+ */
+function areaIndexByCode(areas: any[] | undefined, code: string | null): number {
+  if (!Array.isArray(areas) || areas.length === 0) return 0;
+  if (code) {
+    const i = areas.findIndex((a) => String(a?.area?.code ?? '') === code);
+    if (i >= 0) return i;
+  }
+  return 0;
+}
+
 /** 気象庁週間予報 JSON から全日分の予報(天気コード+気温+信頼度)を抽出 */
-export function parseJmaWeeklyDays(json: unknown): DayForecast[] {
+export function parseJmaWeeklyDays(json: unknown, class10Code: string | null = null): DayForecast[] {
   const root = (Array.isArray(json) ? json : []) as any[];
   const weekly = root[1];
   if (!weekly) return [];
@@ -133,9 +346,11 @@ export function parseJmaWeeklyDays(json: unknown): DayForecast[] {
 
   if (!wts0 || !Array.isArray(wts0.timeDefines)) return [];
 
+  const ai0 = areaIndexByCode(wts0.areas, class10Code);
+
   return (wts0.timeDefines as unknown[]).map((timeStr, i) => {
     const date = dateOf(timeStr);
-    const area0 = wts0.areas?.[0];
+    const area0 = wts0.areas?.[ai0];
     const label = jmaCodeToLabel(area0?.weatherCodes?.[i]);
     const rawRel = area0?.reliabilities?.[i];
     const reliability = rawRel && /^[A-C]$/i.test(String(rawRel)) ? String(rawRel).toUpperCase() : null;
@@ -157,7 +372,7 @@ export function parseJmaWeeklyDays(json: unknown): DayForecast[] {
 }
 
 /** 気象庁 forecast JSON から指定日(YYYY-MM-DD)の予報を取り出す */
-export function parseJmaDay(json: unknown, date: string): DayForecast {
+export function parseJmaDay(json: unknown, date: string, class10Code: string | null = null): DayForecast {
   const root = (Array.isArray(json) ? json : []) as any[];
   const short = root[0];
   const weekly = root[1];
@@ -166,11 +381,12 @@ export function parseJmaDay(json: unknown, date: string): DayForecast {
   let high: number | null = null;
   let low: number | null = null;
 
-  // 天気テキスト: 短期予報 data[0].timeSeries[0]
+  // 天気テキスト: 短期予報 data[0].timeSeries[0](予報区 class10 を選択)
   const wts = short?.timeSeries?.[0];
   if (Array.isArray(wts?.timeDefines)) {
     const i = wts.timeDefines.findIndex((t: unknown) => dateOf(t) === date);
-    if (i >= 0) label = wts.areas?.[0]?.weathers?.[i] ?? '';
+    const ai = areaIndexByCode(wts.areas, class10Code);
+    if (i >= 0) label = wts.areas?.[ai]?.weathers?.[i] ?? '';
   }
 
   // 気温: 週間予報 data[1].timeSeries[1] を優先
@@ -215,10 +431,9 @@ export function parseJmaDay(json: unknown, date: string): DayForecast {
   return { date, high, low, label };
 }
 
-async function fetchJmaJson(name: string): Promise<unknown> {
-  const code = resolveAreaCode(name);
-  if (!code) throw new Error('気象庁エリアを特定できませんでした');
-  const r = await fetch(`https://www.jma.go.jp/bosai/forecast/data/forecast/${code}.json`);
+async function fetchJmaForecast(officeCode: string | null): Promise<unknown> {
+  if (!officeCode) throw new Error('気象庁エリアを特定できませんでした');
+  const r = await fetch(`https://www.jma.go.jp/bosai/forecast/data/forecast/${officeCode}.json`);
   if (!r.ok) throw new Error(`気象庁API応答エラー (HTTP ${r.status})`);
   return r.json();
 }
@@ -258,10 +473,7 @@ export function parseOpenMeteo(json: unknown): DayForecast[] {
   }));
 }
 
-async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
-  const coords = resolveCoords(name);
-  if (!coords) throw new Error('座標を特定できませんでした');
-  const [lat, lon] = coords;
+async function fetchOpenMeteoDays(lat: number, lon: number): Promise<DayForecast[]> {
   // past_days=1 + forecast_days=2 で 昨日・今日・明日(フォールバック用)を取得
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -281,6 +493,7 @@ async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
 interface AmedasStation {
   lat: [number, number];
   lon: [number, number];
+  kjName?: string; // 観測所名(漢字。例: "東京")
   type?: string;
 }
 let amedasTableCache: Record<string, AmedasStation> | null = null;
@@ -337,13 +550,12 @@ function collectTemps(json: unknown): number[] {
  * これから上がる可能性があるので、当日は最低のみ採用し最高は呼び出し側で予報を使う。
  */
 async function fetchAmedasDay(
-  name: string,
+  lat: number,
+  lon: number,
   offset: number
-): Promise<{ high: number | null; low: number | null } | null> {
-  const coords = resolveCoords(name);
-  if (!coords) return null;
+): Promise<{ high: number | null; low: number | null; stationName: string | null } | null> {
   const table = await fetchAmedasTable();
-  const stations = nearestAmedasStations(table, coords[0], coords[1], 3);
+  const stations = nearestAmedasStations(table, lat, lon, 3);
   const ymd = jstDateOffset(offset).replace(/-/g, ''); // 例: 20260530
   const hours = ['00', '03', '06', '09', '12', '15', '18', '21'];
 
@@ -362,7 +574,11 @@ async function fetchAmedasDay(
       if (res.status === 'fulfilled') temps.push(...collectTemps(res.value));
     }
     if (temps.length > 0) {
-      return { high: Math.round(Math.max(...temps)), low: Math.round(Math.min(...temps)) };
+      return {
+        high: Math.round(Math.max(...temps)),
+        low: Math.round(Math.min(...temps)),
+        stationName: table[station]?.kjName ?? null,
+      };
     }
   }
   return null;
@@ -371,19 +587,28 @@ async function fetchAmedasDay(
 // ---- 統合 ----
 
 /**
- * 昨日(気象庁アメダス実測、失敗時 Open-Meteo)+ 今日・明日(気象庁短期)
- * + 明後日〜7日後(気象庁週間)を取得。欠けたフィールドは Open-Meteo で補完する。
+ * 気象庁をメインに、市区町村の予報区(class10)単位で取得する。
+ * - 昨日: 気象庁アメダスの実測気温(失敗時のみ Open-Meteo)
+ * - 今日・明日: 気象庁短期予報(予報区 class10 の天気・気温)。最低気温は当日アメダス実測を優先
+ * - 明後日〜7日後: 気象庁週間予報
+ * Open-Meteo は気象庁が取得できない日のフィールド補完(最終フォールバック)にのみ使う。
  */
 export async function fetchForecast(locationName: string): Promise<Forecast> {
   const yId = jstDateOffset(-1);
   const tId = jstDateOffset(0);
   const mId = jstDateOffset(1);
 
+  // 市町村名にも対応: ジオコーディングで座標+都道府県を1回だけ解決する
+  const loc = await resolveLocation(locationName);
+  // 気象庁の予報区(class10)と forecast を引く office を解決する
+  const jmaArea = await resolveJmaArea(locationName, loc.prefecture);
+  const class10Code = jmaArea?.class10Code ?? null;
+
   const [jmaRes, omRes, amedasYRes, amedasTRes] = await Promise.allSettled([
-    fetchJmaJson(locationName),
-    fetchOpenMeteoDays(locationName),
-    fetchAmedasDay(locationName, -1),
-    fetchAmedasDay(locationName, 0),
+    fetchJmaForecast(jmaArea?.officeCode ?? (loc.prefecture ? resolveAreaCode(loc.prefecture) : null)),
+    fetchOpenMeteoDays(loc.lat, loc.lon),
+    fetchAmedasDay(loc.lat, loc.lon, -1),
+    fetchAmedasDay(loc.lat, loc.lon, 0),
   ]);
 
   const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
@@ -409,9 +634,9 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
   let tomorrow: DayForecast | null = null;
   let weeklyDays: DayForecast[] = [];
   if (jmaRes.status === 'fulfilled') {
-    today = parseJmaDay(jmaRes.value, tId);
-    tomorrow = parseJmaDay(jmaRes.value, mId);
-    weeklyDays = parseJmaWeeklyDays(jmaRes.value);
+    today = parseJmaDay(jmaRes.value, tId, class10Code);
+    tomorrow = parseJmaDay(jmaRes.value, mId, class10Code);
+    weeklyDays = parseJmaWeeklyDays(jmaRes.value, class10Code);
   }
 
   const amedasToday = amedasTRes.status === 'fulfilled' ? amedasTRes.value : null;
@@ -458,9 +683,14 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
     throw new Error(reasons || '予報データが取得できませんでした');
   }
 
+  const amedasName = amedasToday?.stationName ?? amedasY?.stationName ?? null;
+
   return {
     days,
     source: jmaTomorrow ? 'jma' : 'open-meteo',
     fetchedAt: Date.now(),
+    areaName: jmaArea?.class10Name ?? null,
+    officeName: jmaArea?.officeName ?? loc.prefecture ?? null,
+    amedasName,
   };
 }

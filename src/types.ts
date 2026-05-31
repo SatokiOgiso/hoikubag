@@ -57,6 +57,12 @@ export interface Forecast {
   days: DayForecast[];
   source: WeatherSource;
   fetchedAt: number; // Unix ms
+  /** 天気予報の予報区名(気象庁 class10。例: "東京地方")。粒度の明示に使う */
+  areaName?: string | null;
+  /** 府県予報区名(気象庁 office。例: "東京都") */
+  officeName?: string | null;
+  /** 気温の実測に使ったアメダス観測所名(例: "東京") */
+  amedasName?: string | null;
 }
 
 export interface AppState {
