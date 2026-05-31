@@ -198,8 +198,16 @@ export function parseJmaDay(json: unknown, date: string): DayForecast {
         mn = mn == null ? v : Math.min(mn, v);
         mx = mx == null ? v : Math.max(mx, v);
       });
-      low = mn;
-      high = mx;
+      // 当日は午後になると朝の最低点が予報ファイルから消え、日中の最高点だけが残る。
+      // その場合 min==max となり最低気温が誤って最高と同値になるので、
+      // 残った値は最高気温として扱い、最低は null にして他ソース(Open-Meteo)で補完させる。
+      if (mn != null && mx != null && mn === mx) {
+        high = mx;
+        low = null;
+      } else {
+        low = mn;
+        high = mx;
+      }
     }
   }
 
