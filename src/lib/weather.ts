@@ -264,20 +264,110 @@ async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
   return parseOpenMeteo(await r.json());
 }
 
+// ---- 気象庁アメダス(昨日の実測気温) ----
+
+/**
+ * アメダス観測所表。{ 観測所コード: { lat:[度,分], lon:[度,分], ... } }。
+ * 一度取得したらセッション中はキャッシュする。
+ */
+interface AmedasStation {
+  lat: [number, number];
+  lon: [number, number];
+  type?: string;
+}
+let amedasTableCache: Record<string, AmedasStation> | null = null;
+
+async function fetchAmedasTable(): Promise<Record<string, AmedasStation>> {
+  if (amedasTableCache) return amedasTableCache;
+  const r = await fetch('https://www.jma.go.jp/bosai/amedas/const/amedastable.json');
+  if (!r.ok) throw new Error(`アメダス観測所表エラー (HTTP ${r.status})`);
+  amedasTableCache = (await r.json()) as Record<string, AmedasStation>;
+  return amedasTableCache;
+}
+
+const dm = (v: [number, number] | undefined): number =>
+  Array.isArray(v) ? v[0] + v[1] / 60 : NaN;
+
+/** 指定座標に最も近いアメダス観測所コードを距離順で返す(気温欠測時の代替用に複数) */
+function nearestAmedasStations(
+  table: Record<string, AmedasStation>,
+  lat: number,
+  lon: number,
+  limit: number
+): string[] {
+  return Object.entries(table)
+    .map(([code, s]) => {
+      const dLat = dm(s.lat) - lat;
+      const dLon = dm(s.lon) - lon;
+      return { code, dist: dLat * dLat + dLon * dLon };
+    })
+    .filter((x) => Number.isFinite(x.dist))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, limit)
+    .map((x) => x.code);
+}
+
+/** アメダス時別データ(3時間ごとのファイル)から気温配列を集める */
+function collectTemps(json: unknown): number[] {
+  if (!json || typeof json !== 'object') return [];
+  const out: number[] = [];
+  for (const v of Object.values(json as Record<string, { temp?: [number, number | null] }>)) {
+    const t = v?.temp;
+    if (Array.isArray(t) && typeof t[0] === 'number' && Number.isFinite(t[0])) {
+      out.push(t[0]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 昨日の最高・最低気温を気象庁アメダスの実測値から取得する。
+ * 最寄り観測所の昨日24時間分(3時間ごと8ファイル)を集計。取れなければ次の観測所を試す。
+ */
+async function fetchAmedasYesterday(name: string): Promise<{ high: number; low: number } | null> {
+  const coords = resolveCoords(name);
+  if (!coords) return null;
+  const table = await fetchAmedasTable();
+  const stations = nearestAmedasStations(table, coords[0], coords[1], 3);
+  const ymd = jstDateOffset(-1).replace(/-/g, ''); // 例: 20260530
+  const hours = ['00', '03', '06', '09', '12', '15', '18', '21'];
+
+  for (const station of stations) {
+    const results = await Promise.allSettled(
+      hours.map(async (hh) => {
+        const r = await fetch(
+          `https://www.jma.go.jp/bosai/amedas/data/point/${station}/${ymd}${hh}.json`
+        );
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+    );
+    const temps: number[] = [];
+    for (const res of results) {
+      if (res.status === 'fulfilled') temps.push(...collectTemps(res.value));
+    }
+    if (temps.length > 0) {
+      return { high: Math.round(Math.max(...temps)), low: Math.round(Math.min(...temps)) };
+    }
+  }
+  return null;
+}
+
 // ---- 統合 ----
 
 /**
- * 昨日(Open-Meteo)+ 今日・明日(気象庁短期)+ 明後日〜7日後(気象庁週間)を取得。
- * 気象庁が失敗した日は Open-Meteo で補完する。
+ * 昨日(気象庁アメダス実測、失敗時 Open-Meteo)+ 今日・明日(気象庁短期)
+ * + 明後日〜7日後(気象庁週間)を取得。欠けたフィールドは Open-Meteo で補完する。
  */
 export async function fetchForecast(locationName: string): Promise<Forecast> {
   const yId = jstDateOffset(-1);
   const tId = jstDateOffset(0);
   const mId = jstDateOffset(1);
 
-  const [jmaRes, omRes] = await Promise.allSettled([
+  const [jmaRes, omRes, amedasRes] = await Promise.allSettled([
     fetchJmaJson(locationName),
     fetchOpenMeteoDays(locationName),
+    fetchAmedasYesterday(locationName),
   ]);
 
   const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
@@ -313,8 +403,18 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
   today = mergeDay(tId, today);
   tomorrow = mergeDay(mId, tomorrow);
 
-  // 昨日は常に Open-Meteo
-  const yesterday = omOf(yId);
+  // 昨日: 気象庁アメダスの実測気温を優先し、天気テキストは Open-Meteo を使う。
+  // アメダスが取れなければ Open-Meteo の気温にフォールバック。
+  const omYesterday = omOf(yId);
+  const amedas = amedasRes.status === 'fulfilled' ? amedasRes.value : null;
+  const yesterday: DayForecast | null = amedas
+    ? {
+        date: yId,
+        high: amedas.high,
+        low: amedas.low,
+        label: omYesterday?.label ?? '',
+      }
+    : omYesterday;
 
   // 週間予報から明後日〜7日後を追加
   const futureDays: DayForecast[] = [];
