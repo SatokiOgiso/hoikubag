@@ -699,11 +699,11 @@ export default function SettingsModal({
             )}
           </section>
 
-          {/* 地域(表示用) */}
+          {/* 地域(天気の取得先) */}
           <section>
-            <h3 className="text-sm font-bold text-stone-700 mb-2">地域(表示用)</h3>
+            <h3 className="text-sm font-bold text-stone-700 mb-2">地域(天気の取得先)</h3>
             <div className="text-xs text-stone-500 mb-2 leading-relaxed">
-              どこの予報を見ているかが分かるように表示するための地域名です。
+              天気予報の取得に使う地域です。市区町村まで入れると、その地点の予報・気温を取得します。
             </div>
 
             <div className="flex gap-2 mb-2">

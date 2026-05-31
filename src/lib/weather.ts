@@ -61,7 +61,79 @@ function lookup<T>(table: Record<string, T>, name: string): T | null {
 }
 
 export const resolveAreaCode = (name: string): string | null => lookup(JMA_OFFICES, name);
-export const resolveCoords = (name: string): [number, number] | null => lookup(PREF_COORDS, name);
+
+/** ジオコーディングで解決した地点。prefecture は気象庁の予報区/office 解決に使う */
+export interface ResolvedLocation {
+  lat: number;
+  lon: number;
+  prefecture: string | null; // 例: "東京都"(気象庁office 解決用)。不明なら null
+}
+
+const geocodeCache = new Map<string, ResolvedLocation | null>();
+
+/** Open-Meteo Geocoding で市町村名 → 緯度経度 + 都道府県(admin1) を解決 */
+async function geocode(name: string): Promise<ResolvedLocation | null> {
+  const q = encodeURIComponent(name.trim());
+  const url =
+    `https://geocoding-api.open-meteo.com/v1/search?name=${q}` +
+    `&count=1&language=ja&format=json&countryCode=JP`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`ジオコーディング応答エラー (HTTP ${r.status})`);
+  const json = (await r.json()) as {
+    results?: { latitude: number; longitude: number; admin1?: string; country_code?: string }[];
+  };
+  const hit = json.results?.[0];
+  if (!hit) return null;
+  // admin1 が都道府県名(例: "東京都")。気象庁office表に合う形に正規化
+  const pref = hit.admin1 ? normalizePrefecture(hit.admin1) : null;
+  return { lat: hit.latitude, lon: hit.longitude, prefecture: pref };
+}
+
+/** admin1 文字列を JMA_OFFICES のキー(都道府県名)に合わせる */
+function normalizePrefecture(admin1: string): string | null {
+  const a = admin1.trim();
+  if (JMA_OFFICES[a]) return a;
+  // "Tokyo" 等の英名や表記ゆれに備え、部分一致で都道府県キーを探す
+  for (const key of Object.keys(JMA_OFFICES)) {
+    if (a.includes(key) || key.includes(a)) return key;
+  }
+  return null;
+}
+
+/**
+ * 地名(都道府県 or 市町村)を緯度経度+都道府県へ解決する。
+ * 都道府県名そのものはテーブル即引き(API不要)。市町村等はジオコーディング。
+ * 解決できない場合も、都道府県の部分一致でフォールバックする。
+ */
+export async function resolveLocation(name: string): Promise<ResolvedLocation> {
+  const n = (name || '').trim();
+  // 1. 都道府県名そのもの → テーブル即引き(高速・APIコールなし)
+  if (JMA_OFFICES[n] && PREF_COORDS[n]) {
+    return { lat: PREF_COORDS[n][0], lon: PREF_COORDS[n][1], prefecture: n };
+  }
+  // 2. ジオコーディング(キャッシュ)
+  if (geocodeCache.has(n)) {
+    const cached = geocodeCache.get(n) ?? null;
+    if (cached) return cached;
+  } else {
+    try {
+      const geo = await geocode(n);
+      geocodeCache.set(n, geo);
+      if (geo) return geo;
+    } catch {
+      geocodeCache.set(n, null); // 失敗もキャッシュして連打を避ける
+    }
+  }
+  // 3. フォールバック: 都道府県テーブルへの部分一致
+  const pref = (() => {
+    for (const key of Object.keys(PREF_COORDS)) if (n.includes(key)) return key;
+    return null;
+  })();
+  if (pref) {
+    return { lat: PREF_COORDS[pref][0], lon: PREF_COORDS[pref][1], prefecture: pref };
+  }
+  throw new Error('地域を特定できませんでした');
+}
 
 function toTemp(v: unknown): number | null {
   if (v == null) return null;
@@ -215,8 +287,8 @@ export function parseJmaDay(json: unknown, date: string): DayForecast {
   return { date, high, low, label };
 }
 
-async function fetchJmaJson(name: string): Promise<unknown> {
-  const code = resolveAreaCode(name);
+async function fetchJmaJson(prefecture: string | null): Promise<unknown> {
+  const code = prefecture ? resolveAreaCode(prefecture) : null;
   if (!code) throw new Error('気象庁エリアを特定できませんでした');
   const r = await fetch(`https://www.jma.go.jp/bosai/forecast/data/forecast/${code}.json`);
   if (!r.ok) throw new Error(`気象庁API応答エラー (HTTP ${r.status})`);
@@ -258,10 +330,7 @@ export function parseOpenMeteo(json: unknown): DayForecast[] {
   }));
 }
 
-async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
-  const coords = resolveCoords(name);
-  if (!coords) throw new Error('座標を特定できませんでした');
-  const [lat, lon] = coords;
+async function fetchOpenMeteoDays(lat: number, lon: number): Promise<DayForecast[]> {
   // past_days=1 + forecast_days=2 で 昨日・今日・明日(フォールバック用)を取得
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
@@ -337,13 +406,12 @@ function collectTemps(json: unknown): number[] {
  * これから上がる可能性があるので、当日は最低のみ採用し最高は呼び出し側で予報を使う。
  */
 async function fetchAmedasDay(
-  name: string,
+  lat: number,
+  lon: number,
   offset: number
 ): Promise<{ high: number | null; low: number | null } | null> {
-  const coords = resolveCoords(name);
-  if (!coords) return null;
   const table = await fetchAmedasTable();
-  const stations = nearestAmedasStations(table, coords[0], coords[1], 3);
+  const stations = nearestAmedasStations(table, lat, lon, 3);
   const ymd = jstDateOffset(offset).replace(/-/g, ''); // 例: 20260530
   const hours = ['00', '03', '06', '09', '12', '15', '18', '21'];
 
@@ -379,11 +447,14 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
   const tId = jstDateOffset(0);
   const mId = jstDateOffset(1);
 
+  // 市町村名にも対応: ジオコーディングで座標+都道府県を1回だけ解決する
+  const loc = await resolveLocation(locationName);
+
   const [jmaRes, omRes, amedasYRes, amedasTRes] = await Promise.allSettled([
-    fetchJmaJson(locationName),
-    fetchOpenMeteoDays(locationName),
-    fetchAmedasDay(locationName, -1),
-    fetchAmedasDay(locationName, 0),
+    fetchJmaJson(loc.prefecture),
+    fetchOpenMeteoDays(loc.lat, loc.lon),
+    fetchAmedasDay(loc.lat, loc.lon, -1),
+    fetchAmedasDay(loc.lat, loc.lon, 0),
   ]);
 
   const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
