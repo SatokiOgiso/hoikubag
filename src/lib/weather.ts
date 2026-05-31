@@ -198,8 +198,16 @@ export function parseJmaDay(json: unknown, date: string): DayForecast {
         mn = mn == null ? v : Math.min(mn, v);
         mx = mx == null ? v : Math.max(mx, v);
       });
-      low = mn;
-      high = mx;
+      // 当日は午後になると朝の最低点が予報ファイルから消え、日中の最高点だけが残る。
+      // その場合 min==max となり最低気温が誤って最高と同値になるので、
+      // 残った値は最高気温として扱い、最低は null にして他ソース(Open-Meteo)で補完させる。
+      if (mn != null && mx != null && mn === mx) {
+        high = mx;
+        low = null;
+      } else {
+        low = mn;
+        high = mx;
+      }
     }
   }
 
@@ -264,24 +272,138 @@ async function fetchOpenMeteoDays(name: string): Promise<DayForecast[]> {
   return parseOpenMeteo(await r.json());
 }
 
+// ---- 気象庁アメダス(昨日の実測気温) ----
+
+/**
+ * アメダス観測所表。{ 観測所コード: { lat:[度,分], lon:[度,分], ... } }。
+ * 一度取得したらセッション中はキャッシュする。
+ */
+interface AmedasStation {
+  lat: [number, number];
+  lon: [number, number];
+  type?: string;
+}
+let amedasTableCache: Record<string, AmedasStation> | null = null;
+
+async function fetchAmedasTable(): Promise<Record<string, AmedasStation>> {
+  if (amedasTableCache) return amedasTableCache;
+  const r = await fetch('https://www.jma.go.jp/bosai/amedas/const/amedastable.json');
+  if (!r.ok) throw new Error(`アメダス観測所表エラー (HTTP ${r.status})`);
+  amedasTableCache = (await r.json()) as Record<string, AmedasStation>;
+  return amedasTableCache;
+}
+
+const dm = (v: [number, number] | undefined): number =>
+  Array.isArray(v) ? v[0] + v[1] / 60 : NaN;
+
+/** 指定座標に最も近いアメダス観測所コードを距離順で返す(気温欠測時の代替用に複数) */
+function nearestAmedasStations(
+  table: Record<string, AmedasStation>,
+  lat: number,
+  lon: number,
+  limit: number
+): string[] {
+  return Object.entries(table)
+    .map(([code, s]) => {
+      const dLat = dm(s.lat) - lat;
+      const dLon = dm(s.lon) - lon;
+      return { code, dist: dLat * dLat + dLon * dLon };
+    })
+    .filter((x) => Number.isFinite(x.dist))
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, limit)
+    .map((x) => x.code);
+}
+
+/** アメダス時別データ(3時間ごとのファイル)から気温配列を集める */
+function collectTemps(json: unknown): number[] {
+  if (!json || typeof json !== 'object') return [];
+  const out: number[] = [];
+  for (const v of Object.values(json as Record<string, { temp?: [number, number | null] }>)) {
+    const t = v?.temp;
+    if (Array.isArray(t) && typeof t[0] === 'number' && Number.isFinite(t[0])) {
+      out.push(t[0]);
+    }
+  }
+  return out;
+}
+
+/**
+ * 指定日の最高・最低気温を気象庁アメダスの実測値から取得する。
+ * 最寄り観測所のその日 24時間分(3時間ごと8ファイル)を集計。取れなければ次の観測所を試す。
+ *
+ * 当日に使う場合、未来の時間帯ファイルは未作成(404)なので、取得できた時間帯までの
+ * 実測のみで集計する。最低気温は明け方に出るため午前以降ならほぼ確定値だが、最高気温は
+ * これから上がる可能性があるので、当日は最低のみ採用し最高は呼び出し側で予報を使う。
+ */
+async function fetchAmedasDay(
+  name: string,
+  offset: number
+): Promise<{ high: number | null; low: number | null } | null> {
+  const coords = resolveCoords(name);
+  if (!coords) return null;
+  const table = await fetchAmedasTable();
+  const stations = nearestAmedasStations(table, coords[0], coords[1], 3);
+  const ymd = jstDateOffset(offset).replace(/-/g, ''); // 例: 20260530
+  const hours = ['00', '03', '06', '09', '12', '15', '18', '21'];
+
+  for (const station of stations) {
+    const results = await Promise.allSettled(
+      hours.map(async (hh) => {
+        const r = await fetch(
+          `https://www.jma.go.jp/bosai/amedas/data/point/${station}/${ymd}${hh}.json`
+        );
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
+    );
+    const temps: number[] = [];
+    for (const res of results) {
+      if (res.status === 'fulfilled') temps.push(...collectTemps(res.value));
+    }
+    if (temps.length > 0) {
+      return { high: Math.round(Math.max(...temps)), low: Math.round(Math.min(...temps)) };
+    }
+  }
+  return null;
+}
+
 // ---- 統合 ----
 
 /**
- * 昨日(Open-Meteo)+ 今日・明日(気象庁短期)+ 明後日〜7日後(気象庁週間)を取得。
- * 気象庁が失敗した日は Open-Meteo で補完する。
+ * 昨日(気象庁アメダス実測、失敗時 Open-Meteo)+ 今日・明日(気象庁短期)
+ * + 明後日〜7日後(気象庁週間)を取得。欠けたフィールドは Open-Meteo で補完する。
  */
 export async function fetchForecast(locationName: string): Promise<Forecast> {
   const yId = jstDateOffset(-1);
   const tId = jstDateOffset(0);
   const mId = jstDateOffset(1);
 
-  const [jmaRes, omRes] = await Promise.allSettled([
+  const [jmaRes, omRes, amedasYRes, amedasTRes] = await Promise.allSettled([
     fetchJmaJson(locationName),
     fetchOpenMeteoDays(locationName),
+    fetchAmedasDay(locationName, -1),
+    fetchAmedasDay(locationName, 0),
   ]);
 
   const omDays = omRes.status === 'fulfilled' ? omRes.value : [];
   const omOf = (date: string) => omDays.find((d) => d.date === date) ?? null;
+
+  // 気象庁を優先しつつ、欠けたフィールド(気温/天気)だけ Open-Meteo で補完する。
+  // 夜間は気象庁の当日気温が "" になり気温だけ欠けることがあるため、日まるごとでなく
+  // フィールド単位でマージしないと「今日の気温が出ない」状態になる。
+  const mergeDay = (date: string, jma: DayForecast | null): DayForecast | null => {
+    const om = omOf(date);
+    if (!hasData(jma)) return om;
+    if (!om) return jma;
+    return {
+      date,
+      high: jma.high ?? om.high,
+      low: jma.low ?? om.low,
+      label: jma.label || om.label,
+      reliability: jma.reliability ?? null,
+    };
+  };
 
   let today: DayForecast | null = null;
   let tomorrow: DayForecast | null = null;
@@ -292,13 +414,32 @@ export async function fetchForecast(locationName: string): Promise<Forecast> {
     weeklyDays = parseJmaWeeklyDays(jmaRes.value);
   }
 
-  // 今日・明日が気象庁で取れたか(取れなければ Open-Meteo で補完)
-  const jmaTomorrow = hasData(tomorrow);
-  if (!hasData(today)) today = omOf(tId);
-  if (!hasData(tomorrow)) tomorrow = omOf(mId);
+  const amedasToday = amedasTRes.status === 'fulfilled' ? amedasTRes.value : null;
 
-  // 昨日は常に Open-Meteo
-  const yesterday = omOf(yId);
+  // 今日: 最低気温は明け方に確定するため、観測済みならアメダスの実測値を優先する。
+  // 最高気温はこれから上がる可能性があるので気象庁の予報を尊重する。
+  if (today && amedasToday?.low != null) {
+    today = { ...today, low: amedasToday.low };
+  }
+
+  // 今日・明日: 気象庁を主にしつつ欠けたフィールドを Open-Meteo で補う
+  const jmaTomorrow = hasData(tomorrow);
+  today = mergeDay(tId, today);
+  tomorrow = mergeDay(mId, tomorrow);
+
+  // 昨日: 気象庁アメダスの実測気温を優先し、天気テキストは Open-Meteo を使う。
+  // アメダスが取れなければ Open-Meteo の気温にフォールバック。
+  const omYesterday = omOf(yId);
+  const amedasY = amedasYRes.status === 'fulfilled' ? amedasYRes.value : null;
+  const yesterday: DayForecast | null =
+    amedasY && (amedasY.high != null || amedasY.low != null)
+      ? {
+          date: yId,
+          high: amedasY.high ?? omYesterday?.high ?? null,
+          low: amedasY.low ?? omYesterday?.low ?? null,
+          label: omYesterday?.label ?? '',
+        }
+      : omYesterday;
 
   // 週間予報から明後日〜7日後を追加
   const futureDays: DayForecast[] = [];
