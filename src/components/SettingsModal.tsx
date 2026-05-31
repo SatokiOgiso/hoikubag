@@ -19,6 +19,7 @@ interface Props {
   fontScale: number;
   onFontScale: (v: number) => void;
   showToast: (msg: string) => void;
+  onShowOnboarding: () => void;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -52,6 +53,7 @@ export default function SettingsModal({
   fontScale,
   onFontScale,
   showToast,
+  onShowOnboarding,
   onClose,
   actions,
 }: Props) {
@@ -837,6 +839,17 @@ export default function SettingsModal({
                 </div>
               </div>
             </div>
+          </section>
+
+          {/* 使い方(オンボーディング再表示) */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-2">はじめての設定</h3>
+            <button
+              onClick={onShowOnboarding}
+              className="w-full rounded-xl py-3 bg-white border border-stone-200 text-stone-700 font-bold active:scale-95 transition-all"
+            >
+              初期設定をもう一度ひらく
+            </button>
           </section>
 
           {/* 準備リマインド通知 */}

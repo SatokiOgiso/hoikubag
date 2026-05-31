@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Settings, RefreshCw } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
-import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from './constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
+import Onboarding, { type OnboardingData } from './components/Onboarding';
+
+const ONBOARDED_KEY = 'hoiku-onboarded-v1';
 
 export default function App() {
   const {
@@ -24,6 +27,9 @@ export default function App() {
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
+  // オンボーディング: 初回起動 or 設定からの再表示
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingFirstRun, setOnboardingFirstRun] = useState(false);
   const [fontScale, setFontScaleState] = useState<number>(() => {
     const s = localStorage.getItem('fontScale');
     return s ? parseFloat(s) : 1.0;
@@ -37,6 +43,34 @@ export default function App() {
     document.documentElement.style.fontSize = `${fontScale * 16}px`;
     return () => { document.documentElement.style.fontSize = ''; };
   }, [fontScale]);
+
+  // 初回起動判定: まだオンボーディング未完了 かつ 既存データ/共有がない時だけ表示
+  useEffect(() => {
+    if (loading) return;
+    if (localStorage.getItem(ONBOARDED_KEY)) return;
+    // 既存ユーザー(保存データあり/共有参加済み)は対象外として静かに完了扱い
+    if (familyId || localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(ONBOARDED_KEY, '1');
+      return;
+    }
+    setOnboardingFirstRun(true);
+    setShowOnboarding(true);
+  }, [loading, familyId]);
+
+  const finishOnboarding = (data: OnboardingData) => {
+    actions.applyOnboarding(data);
+    localStorage.setItem(ONBOARDED_KEY, '1');
+    setShowOnboarding(false);
+  };
+  const closeOnboarding = () => {
+    localStorage.setItem(ONBOARDED_KEY, '1');
+    setShowOnboarding(false);
+  };
+  const reopenOnboarding = () => {
+    setOnboardingFirstRun(false);
+    setShowSettings(false);
+    setShowOnboarding(true);
+  };
 
   if (loading || !state) {
     return (
@@ -171,8 +205,18 @@ export default function App() {
           fontScale={fontScale}
           onFontScale={setFontScale}
           showToast={showToast}
+          onShowOnboarding={reopenOnboarding}
           onClose={() => setShowSettings(false)}
           actions={actions}
+        />
+      )}
+
+      {showOnboarding && (
+        <Onboarding
+          state={state}
+          isFirstRun={onboardingFirstRun}
+          onComplete={finishOnboarding}
+          onClose={closeOnboarding}
         />
       )}
 
