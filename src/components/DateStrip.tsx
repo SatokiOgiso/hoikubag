@@ -175,6 +175,24 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
         {/* 末尾センチネル: 見えたら日付を追加 */}
         <div ref={sentinelRef} className="shrink-0 w-1" />
       </div>
+
+      {/* 予報の粒度を明示(どの予報区・どの観測所のデータか) */}
+      {forecast && (forecast.areaName || forecast.amedasName) && (
+        <div className="px-1 mt-1.5 text-[11px] text-stone-400 leading-relaxed">
+          {forecast.areaName && (
+            <span>
+              天気: 気象庁「{forecast.areaName}」予報区
+              {forecast.officeName ? `(${forecast.officeName})` : ''}
+            </span>
+          )}
+          {forecast.amedasName && (
+            <span>
+              {forecast.areaName ? ' / ' : ''}
+              気温: アメダス{forecast.amedasName}観測所
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
