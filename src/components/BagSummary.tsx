@@ -47,8 +47,8 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                     confirmed
                       ? 'bg-emerald-500'
                       : active
-                      ? 'bg-white/10 border-2 border-dashed border-white/25'
-                      : 'bg-stone-100 border-2 border-dashed border-stone-200'
+                      ? 'bg-red-400/20 border-2 border-dashed border-red-300/50'
+                      : 'bg-red-50 border-2 border-dashed border-red-200'
                   }`}
                   aria-label={confirmed ? '確定済み' : '未確定'}
                 >
@@ -63,13 +63,21 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                         style={{ background: active ? 'rgba(255,255,255,0.6)' : '#A8A29E' }}
                       />
                       <div className="font-bold text-[21px]">{c.name}</div>
-                      {confirmed && (
+                      {confirmed ? (
                         <span
                           className={`text-[15px] font-bold ${
                             active ? 'text-emerald-400' : 'text-emerald-600'
                           }`}
                         >
                           確定済み
+                        </span>
+                      ) : (
+                        <span
+                          className={`text-[15px] font-bold ${
+                            active ? 'text-red-300' : 'text-red-400'
+                          }`}
+                        >
+                          未確定・入力中
                         </span>
                       )}
                     </div>
