@@ -244,8 +244,8 @@ export function useAppState() {
           } else {
             items[key] = v;
           }
-          // 確定後に内容を変えたら確定を解除する
-          return { items, confirmed: false };
+          // 確定後に内容を変えたら確定を解除する(メモ類は引き継ぐ)
+          return { ...b, items, confirmed: false };
         });
         save(next);
         return next;
