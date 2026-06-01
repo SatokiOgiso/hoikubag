@@ -30,6 +30,10 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
             const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
             const dayMemo = bag.dayMemo?.trim() ?? '';
+            // サマリーに出す品目: 数量がある品目 + 数量0でもメモが付いた品目
+            const shownItems = items.filter(
+              (i) => cItems[i.key] || bag.itemNotes?.[i.key]?.trim()
+            );
             const active = c.id === state.currentChildId;
             const confirmed = !!bag.confirmed;
             const editedLabel = relativeEditedAt(c.itemsUpdatedAt);
@@ -104,35 +108,55 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                       )}
                     </div>
                   </div>
-                  {(cTotal > 0 || cNotes.length > 0) && (
+                  {(shownItems.length > 0 || cNotes.length > 0) && (
                     <div className="flex flex-wrap gap-1.5">
-                      {items
-                        .filter((i) => cItems[i.key])
-                        .map((i) => {
-                          const note = bag.itemNotes?.[i.key]?.trim();
-                          return (
-                            <div
-                              key={i.key}
-                              className={`px-2.5 py-1 rounded text-[16px] font-medium flex items-center gap-1.5 ${
-                                active ? 'bg-white/10' : 'bg-stone-100'
+                      {shownItems.map((i) => {
+                        const note = bag.itemNotes?.[i.key]?.trim();
+                        const qty = cItems[i.key] || 0;
+                        const zeroWithNote = qty === 0; // 数量0でメモのみ → 注意を引く赤表示
+                        return (
+                          <div
+                            key={i.key}
+                            className={`px-2.5 py-1 rounded text-[16px] font-medium flex items-center gap-1.5 ${
+                              zeroWithNote
+                                ? active
+                                  ? 'bg-red-400/20'
+                                  : 'bg-red-50'
+                                : active
+                                ? 'bg-white/10'
+                                : 'bg-stone-100'
+                            }`}
+                          >
+                            <span className="text-[18px] leading-none">{i.emoji}</span>
+                            <span className={zeroWithNote ? (active ? 'text-red-300' : 'text-red-500') : ''}>
+                              {i.key}
+                            </span>
+                            <span
+                              className={`font-black ${
+                                zeroWithNote ? (active ? 'text-red-300' : 'text-red-500') : ''
                               }`}
                             >
-                              <span className="text-[18px] leading-none">{i.emoji}</span>
-                              <span>{i.key}</span>
-                              <span className="font-black">{cItems[i.key]}</span>
-                              {note && (
-                                <span
-                                  className={`ml-0.5 flex items-center gap-0.5 text-[13px] font-normal ${
-                                    active ? 'text-white/60' : 'text-stone-500'
-                                  }`}
-                                >
-                                  <MessageSquare size={11} className="shrink-0" />
-                                  {note}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
+                              {qty}
+                            </span>
+                            {note && (
+                              <span
+                                className={`ml-0.5 flex items-center gap-0.5 text-[13px] font-normal ${
+                                  zeroWithNote
+                                    ? active
+                                      ? 'text-red-300'
+                                      : 'text-red-500'
+                                    : active
+                                    ? 'text-white/60'
+                                    : 'text-stone-500'
+                                }`}
+                              >
+                                <MessageSquare size={11} className="shrink-0" />
+                                {note}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                       {cNotes.map((n, i) => (
                         <div
                           key={`note-${i}`}
