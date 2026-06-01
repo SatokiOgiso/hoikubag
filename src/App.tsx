@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, RefreshCw } from 'lucide-react';
+import { Settings, RefreshCw, BarChart3 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
@@ -7,6 +7,7 @@ import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
+import AnalyticsModal from './components/AnalyticsModal';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
@@ -27,6 +28,7 @@ export default function App() {
     actions,
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   // オンボーディング: 初回起動 or 設定からの再表示
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingFirstRun, setOnboardingFirstRun] = useState(false);
@@ -150,6 +152,13 @@ export default function App() {
                 </div>
               )}
               <button
+                onClick={() => setShowAnalytics(true)}
+                className="w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="分析"
+              >
+                <BarChart3 size={22} className="text-stone-600" />
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
                 className="w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
                 aria-label="設定"
@@ -210,6 +219,14 @@ export default function App() {
           onShowOnboarding={reopenOnboarding}
           onClose={() => setShowSettings(false)}
           actions={actions}
+        />
+      )}
+
+      {showAnalytics && (
+        <AnalyticsModal
+          state={state}
+          items={allItems}
+          onClose={() => setShowAnalytics(false)}
         />
       )}
 
