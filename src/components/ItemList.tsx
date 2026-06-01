@@ -206,7 +206,7 @@ export default function ItemList({
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  {!confirmed && (count > 0 || localItemNotes[item.key]?.trim()) && (
+                  {!confirmed && (
                     <button
                       onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
                       className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
