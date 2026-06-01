@@ -204,7 +204,7 @@ export function useAppState() {
         } else {
           bags[date] = nextBag;
         }
-        return { ...c, bags };
+        return { ...c, bags, itemsUpdatedAt: Date.now() };
       }),
     [mapCurrentChild]
   );
@@ -358,7 +358,11 @@ export function useAppState() {
         ...prev,
         children: prev.children.map((c) =>
           c.id === id
-            ? { ...c, bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } } }
+            ? {
+                ...c,
+                bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
+                itemsUpdatedAt: Date.now(),
+              }
             : c
         ),
       };
@@ -378,6 +382,7 @@ export function useAppState() {
         children: prev.children.map((c) => ({
           ...c,
           bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
+          itemsUpdatedAt: Date.now(),
         })),
       };
       save(next);
@@ -437,7 +442,7 @@ export function useAppState() {
           for (const d of toDates) {
             bags[d] = { items: { ...fromItems }, confirmed: false };
           }
-          return { ...c, bags };
+          return { ...c, bags, itemsUpdatedAt: Date.now() };
         }),
       };
       save(next);

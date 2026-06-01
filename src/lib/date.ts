@@ -48,3 +48,32 @@ export function dateLabel(isoDate: string): string {
   else if (isoDate === jstDateOffset(1)) rel = '明日 · ';
   return rel + base;
 }
+
+/**
+ * 編集日時(Unix ms)を相対表現にする。例: "たった今" "5分前" "3時間前" "昨日 14:30" "5/28 9:05"。
+ * JST 基準。
+ */
+export function relativeEditedAt(ts: number | undefined | null, now: number = Date.now()): string {
+  if (!ts) return '';
+  const diff = now - ts;
+  if (diff < 0) return 'たった今';
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'たった今';
+  if (min < 60) return `${min}分前`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}時間前`;
+
+  // 時刻(JST)
+  const hm = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(ts));
+
+  const tsDate = jstDateOffset(0, new Date(ts));
+  if (tsDate === jstDateOffset(-1)) return `昨日 ${hm}`;
+  // それ以前は M/D HH:MM
+  const [, mm, dd] = tsDate.split('-');
+  return `${Number(mm)}/${Number(dd)} ${hm}`;
+}

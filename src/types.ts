@@ -31,6 +31,7 @@ export interface Child {
   bags: Record<string, DayBag>; // 日付(YYYY-MM-DD)ごとのかばん
   defaults: Record<string, number>; // リセット時の初期値。例: { "おむつ": 3, "肌着": 1 }
   recurringItems?: RecurringItem[];
+  itemsUpdatedAt?: number; // 持ち物(かばん/メモ)を最後に編集した日時(Unix ms)
   // 旧形式(マイグレーション用・読み込み時のみ)
   items?: Record<string, number>;
   confirmed?: boolean;
