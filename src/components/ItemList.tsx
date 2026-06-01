@@ -52,6 +52,9 @@ export default function ItemList({
   const [showCopy, setShowCopy] = useState(false);
   const [copyTargets, setCopyTargets] = useState<string[]>([]);
   const [confirmResetAll, setConfirmResetAll] = useState(false);
+  const [confirmResetChild, setConfirmResetChild] = useState(false);
+  // 直近に増減した品目キー(数量表示を一瞬パルスさせるフィードバック用)
+  const [pulseKey, setPulseKey] = useState<string | null>(null);
 
   const effectiveCounts = effectiveItems(child, date, closedWeekdays);
   const recKeys = recurringKeys(child, date);
@@ -113,6 +116,13 @@ export default function ItemList({
     }
   };
 
+  // 数量を増減しつつ、その品目の数量表示を一瞬パルスさせる
+  const bumpItem = (key: string, delta: number, base: number) => {
+    onChangeItem(date, key, delta, base);
+    setPulseKey(key);
+    setTimeout(() => setPulseKey((k) => (k === key ? null : k)), 300);
+  };
+
   const toggleCopyTarget = (d: string) => {
     setCopyTargets((prev) =>
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
@@ -134,10 +144,10 @@ export default function ItemList({
         ) : (
           totalCount > 0 && (
             <button
-              onClick={() => onReset(date, child.id)}
-              className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 active:scale-95"
+              onClick={() => setConfirmResetChild(true)}
+              className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 rounded-lg hover:text-red-600 active:scale-95 transition-all"
             >
-              <RefreshCw size={12} /> リセット
+              <RefreshCw size={14} /> リセット
             </button>
           )
         )}
@@ -188,19 +198,25 @@ export default function ItemList({
                   >
                     {item.key}
                   </div>
-                  {!confirmed && warn && (
-                    <div className="text-xs text-amber-700 mt-0.5 flex items-center gap-1 font-medium">
-                      <AlertTriangle size={11} />
-                      {isHot ? '暑い予報です' : '涼しい予報です'}
+                  {(!confirmed && warn) || (!confirmed && isRecurring && count > 0) ? (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {!confirmed && warn && (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          <AlertTriangle size={13} />
+                          {isHot ? '暑い予報です' : '涼しい予報です'}
+                        </span>
+                      )}
+                      {!confirmed && isRecurring && count > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-500">
+                          🔁 定期
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {!confirmed && isRecurring && count > 0 && (
-                    <div className="text-[10px] text-stone-400 mt-0.5 font-medium">🔁 定期</div>
-                  )}
+                  ) : null}
                   {/* 品目メモ(確定済みでも内容は見える) */}
                   {(localItemNotes[item.key]?.trim() || openItemNote === item.key) && (
-                    <div className="text-xs text-stone-500 mt-0.5 flex items-start gap-1">
-                      <MessageSquare size={11} className="mt-0.5 shrink-0 text-stone-400" />
+                    <div className="text-xs text-blue-700 mt-1 flex items-start gap-1 bg-blue-50 rounded-lg px-2 py-1">
+                      <MessageSquare size={13} className="mt-0.5 shrink-0 text-blue-500" />
                       <span className="break-words">{localItemNotes[item.key]}</span>
                     </div>
                   )}
@@ -209,37 +225,40 @@ export default function ItemList({
                   {!confirmed && (
                     <button
                       onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
-                      className={`w-9 h-9 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                      className={`w-11 h-11 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
                         localItemNotes[item.key]?.trim()
                           ? 'bg-stone-200 text-stone-600'
                           : 'bg-stone-100 text-stone-400'
                       }`}
                       aria-label="この品目にメモ"
                     >
-                      <MessageSquare size={16} />
+                      <MessageSquare size={18} />
                     </button>
                   )}
                   <button
-                    onClick={() => onChangeItem(date, item.key, -1, count)}
+                    onClick={() => bumpItem(item.key, -1, count)}
                     disabled={confirmed || count === 0}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
                       confirmed || count === 0
                         ? 'bg-stone-100 text-stone-300'
                         : 'bg-stone-100 text-stone-700'
                     }`}
                     aria-label="減らす"
                   >
-                    <Minus size={18} />
+                    <Minus size={20} />
                   </button>
                   <div
-                    className={`w-12 text-center font-black text-2xl ${
+                    aria-live="polite"
+                    className={`w-12 text-center font-black text-2xl transition-transform duration-150 ${
+                      pulseKey === item.key ? 'scale-125' : 'scale-100'
+                    } ${
                       confirmed ? 'text-stone-300' : count > 0 ? 'text-stone-800' : 'text-stone-300'
                     }`}
                   >
                     {count}
                   </div>
                   <button
-                    onClick={() => onChangeItem(date, item.key, 1, count)}
+                    onClick={() => bumpItem(item.key, 1, count)}
                     disabled={confirmed}
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all disabled:opacity-30"
                     style={{ background: ACCENT }}
@@ -310,8 +329,8 @@ export default function ItemList({
               {!confirmed && (
                 <button
                   onClick={() => removeNote(i)}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center bg-stone-100 text-stone-400 active:scale-90 transition-all shrink-0"
-                  aria-label="削除"
+                  className="w-11 h-11 rounded-xl flex items-center justify-center bg-stone-100 text-stone-400 active:bg-red-100 active:text-red-500 active:scale-90 transition-all shrink-0"
+                  aria-label={note.trim() ? `「${note.trim()}」を削除` : 'メモを削除'}
                 >
                   <X size={18} />
                 </button>
@@ -333,10 +352,11 @@ export default function ItemList({
 
       {/* その日全体のメモ */}
       <div className="mt-4">
-        <div className="text-xs font-bold text-stone-500 mb-1.5 flex items-center gap-1.5">
+        <label htmlFor="day-memo" className="text-xs font-bold text-stone-500 mb-1.5 flex items-center gap-1.5">
           <MessageSquare size={13} /> この日のメモ
-        </div>
+        </label>
         <textarea
+          id="day-memo"
           value={localDayMemo}
           onChange={(e) => updateDayMemo(e.target.value)}
           readOnly={confirmed}
@@ -352,10 +372,13 @@ export default function ItemList({
 
       {/* 確定ボタン */}
       <button
-        onClick={() => onToggleConfirm(date)}
+        onClick={() => {
+          onToggleConfirm(date);
+          showToast(confirmed ? '確定を取り消しました' : `${child.name}の準備を確定しました`);
+        }}
         className={`w-full mt-4 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all ${
           confirmed
-            ? 'bg-white border-2 border-emerald-500 text-emerald-600'
+            ? 'bg-white border-2 border-emerald-500 text-emerald-600 ring-2 ring-emerald-200'
             : 'text-white shadow-sm'
         }`}
         style={confirmed ? {} : { background: '#10B981' }}
@@ -446,6 +469,20 @@ export default function ItemList({
         </div>
       )}
     </div>
+
+    {confirmResetChild && (
+      <ConfirmDialog
+        title="リストをリセットしますか?"
+        message={`${shortDateLabel(date)}の${child.name}の準備リストがデフォルトに戻ります。`}
+        confirmLabel="リセットする"
+        destructive
+        onConfirm={() => {
+          onReset(date, child.id);
+          setConfirmResetChild(false);
+        }}
+        onCancel={() => setConfirmResetChild(false)}
+      />
+    )}
 
     {confirmResetAll && (
       <ConfirmDialog

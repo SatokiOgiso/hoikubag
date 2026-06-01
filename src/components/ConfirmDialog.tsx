@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 export interface ConfirmOptions {
@@ -22,6 +23,15 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  // Escape キーでキャンセルできるようにする
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
@@ -47,6 +57,7 @@ export default function ConfirmDialog({
         <div className="flex gap-2 px-4 pb-4">
           <button
             onClick={onCancel}
+            autoFocus={destructive}
             className="flex-1 py-3 rounded-2xl bg-stone-100 text-stone-600 font-bold active:scale-95 transition-all"
           >
             キャンセル
