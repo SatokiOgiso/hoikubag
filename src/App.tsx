@@ -190,6 +190,8 @@ export default function App() {
           onToggleConfirm={actions.toggleConfirm}
           onCopyBag={actions.copyBag}
           onChangeNotes={actions.changeNotes}
+          onChangeItemNote={actions.changeItemNote}
+          onChangeDayMemo={actions.changeDayMemo}
           showToast={showToast}
         />
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X, Users } from 'lucide-react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X, Users, MessageSquare } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { ACCENT } from '../constants';
 import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
@@ -20,6 +20,8 @@ interface Props {
   onToggleConfirm: (date: string) => void;
   onCopyBag: (childId: string, fromDate: string, toDates: string[]) => void;
   onChangeNotes: (date: string, notes: string[]) => void;
+  onChangeItemNote: (date: string, key: string, note: string) => void;
+  onChangeDayMemo: (date: string, memo: string) => void;
   showToast: (msg: string, undo?: () => void) => void;
 }
 
@@ -43,6 +45,8 @@ export default function ItemList({
   onToggleConfirm,
   onCopyBag,
   onChangeNotes,
+  onChangeItemNote,
+  onChangeDayMemo,
   showToast,
 }: Props) {
   const [showCopy, setShowCopy] = useState(false);
@@ -55,10 +59,27 @@ export default function ItemList({
   const confirmed = !!(child.bags?.[date]?.confirmed);
 
   const [localNotes, setLocalNotes] = useState<string[]>(() => child.bags?.[date]?.notes ?? []);
+  const [localItemNotes, setLocalItemNotes] = useState<Record<string, string>>(
+    () => child.bags?.[date]?.itemNotes ?? {}
+  );
+  const [openItemNote, setOpenItemNote] = useState<string | null>(null);
+  const [localDayMemo, setLocalDayMemo] = useState<string>(() => child.bags?.[date]?.dayMemo ?? '');
   useEffect(() => {
     setLocalNotes(child.bags?.[date]?.notes ?? []);
+    setLocalItemNotes(child.bags?.[date]?.itemNotes ?? {});
+    setLocalDayMemo(child.bags?.[date]?.dayMemo ?? '');
+    setOpenItemNote(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, child.id]);
+
+  const updateItemNote = (key: string, value: string) => {
+    setLocalItemNotes((prev) => ({ ...prev, [key]: value }));
+    onChangeItemNote(date, key, value);
+  };
+  const updateDayMemo = (value: string) => {
+    setLocalDayMemo(value);
+    onChangeDayMemo(date, value);
+  };
 
   const copyDates = Array.from({ length: 9 }, (_, i) => jstDateOffset(i - 1)).filter(
     (d) => d !== date
@@ -176,8 +197,28 @@ export default function ItemList({
                   {!confirmed && isRecurring && count > 0 && (
                     <div className="text-[10px] text-stone-400 mt-0.5 font-medium">🔁 定期</div>
                   )}
+                  {/* 品目メモ(確定済みでも内容は見える) */}
+                  {(localItemNotes[item.key]?.trim() || openItemNote === item.key) && (
+                    <div className="text-xs text-stone-500 mt-0.5 flex items-start gap-1">
+                      <MessageSquare size={11} className="mt-0.5 shrink-0 text-stone-400" />
+                      <span className="break-words">{localItemNotes[item.key]}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
+                  {!confirmed && (
+                    <button
+                      onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
+                      className={`w-9 h-9 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                        localItemNotes[item.key]?.trim()
+                          ? 'bg-stone-200 text-stone-600'
+                          : 'bg-stone-100 text-stone-400'
+                      }`}
+                      aria-label="この品目にメモ"
+                    >
+                      <MessageSquare size={16} />
+                    </button>
+                  )}
                   <button
                     onClick={() => onChangeItem(date, item.key, -1, count)}
                     disabled={confirmed || count === 0}
@@ -208,6 +249,22 @@ export default function ItemList({
                   </button>
                 </div>
               </div>
+              {/* 品目メモ入力欄(開いている時・未確定) */}
+              {!confirmed && openItemNote === item.key && (
+                <div className="px-3 pb-2.5 -mt-1">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={localItemNotes[item.key] ?? ''}
+                    onChange={(e) => updateItemNote(item.key, e.target.value)}
+                    onBlur={() => {
+                      if (!localItemNotes[item.key]?.trim()) setOpenItemNote(null);
+                    }}
+                    placeholder="例: 遠足で多めに、汚れた分の替え など"
+                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 outline-none focus:border-stone-400 text-stone-700"
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -272,6 +329,25 @@ export default function ItemList({
             <Plus size={14} /> その日だけの持ち物を追加
           </button>
         )}
+      </div>
+
+      {/* その日全体のメモ */}
+      <div className="mt-4">
+        <div className="text-xs font-bold text-stone-500 mb-1.5 flex items-center gap-1.5">
+          <MessageSquare size={13} /> この日のメモ
+        </div>
+        <textarea
+          value={localDayMemo}
+          onChange={(e) => updateDayMemo(e.target.value)}
+          readOnly={confirmed}
+          rows={2}
+          placeholder="例: お昼寝布団を持ち帰り、水筒は大きいもの など"
+          className={`w-full text-sm rounded-2xl px-3.5 py-3 border outline-none resize-y transition-all ${
+            confirmed
+              ? 'bg-stone-50 border-stone-200 text-stone-500'
+              : 'bg-white border-stone-200 focus:border-stone-400 text-stone-700'
+          }`}
+        />
       </div>
 
       {/* 確定ボタン */}

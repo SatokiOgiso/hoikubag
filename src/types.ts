@@ -5,6 +5,8 @@ export interface DayBag {
   items: Record<string, number>; // 入力。例: { "おむつ": 3 }
   confirmed?: boolean; // その日の準備を確定したか
   notes?: string[]; // その日限りのメモ(書類名など)
+  itemNotes?: Record<string, string>; // 品目ごとのメモ(普段と違う個数の理由など)
+  dayMemo?: string; // その日全体のメモ
 }
 
 export type RecurrenceType = 'weekly' | 'monthly';
