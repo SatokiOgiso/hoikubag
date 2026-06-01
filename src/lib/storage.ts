@@ -40,6 +40,7 @@ export function migrate(raw: unknown): AppState | null {
         ...(Array.isArray(b.notes) ? { notes: b.notes } : {}),
         ...(b.itemNotes && typeof b.itemNotes === 'object' ? { itemNotes: b.itemNotes } : {}),
         ...(typeof b.dayMemo === 'string' ? { dayMemo: b.dayMemo } : {}),
+        ...(typeof b.updatedAt === 'number' ? { updatedAt: b.updatedAt } : {}),
       };
     }
     return {
@@ -48,7 +49,6 @@ export function migrate(raw: unknown): AppState | null {
       bags,
       defaults: c.defaults || {},
       recurringItems: Array.isArray(c.recurringItems) ? c.recurringItems : undefined,
-      itemsUpdatedAt: typeof c.itemsUpdatedAt === 'number' ? c.itemsUpdatedAt : undefined,
     };
   });
 

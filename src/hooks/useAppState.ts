@@ -197,6 +197,7 @@ export function useAppState() {
           notes: bag.notes ? [...bag.notes] : undefined,
           itemNotes: bag.itemNotes ? { ...bag.itemNotes } : undefined,
           dayMemo: bag.dayMemo,
+          updatedAt: bag.updatedAt,
         });
         const bags = { ...c.bags };
         // 空かつ未確定かつメモ類なしのかばんは保持しない(肥大化を避ける)
@@ -213,9 +214,10 @@ export function useAppState() {
         ) {
           delete bags[date];
         } else {
-          bags[date] = nextBag;
+          // この日の編集日時を記録
+          bags[date] = { ...nextBag, updatedAt: Date.now() };
         }
-        return { ...c, bags, itemsUpdatedAt: Date.now() };
+        return { ...c, bags };
       }),
     [mapCurrentChild]
   );
@@ -371,8 +373,10 @@ export function useAppState() {
           c.id === id
             ? {
                 ...c,
-                bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
-                itemsUpdatedAt: Date.now(),
+                bags: {
+                  ...c.bags,
+                  [date]: { items: { ...c.defaults }, confirmed: false, updatedAt: Date.now() },
+                },
               }
             : c
         ),
@@ -392,8 +396,10 @@ export function useAppState() {
         ...prev,
         children: prev.children.map((c) => ({
           ...c,
-          bags: { ...c.bags, [date]: { items: { ...c.defaults }, confirmed: false } },
-          itemsUpdatedAt: Date.now(),
+          bags: {
+            ...c.bags,
+            [date]: { items: { ...c.defaults }, confirmed: false, updatedAt: Date.now() },
+          },
         })),
       };
       save(next);
@@ -481,10 +487,11 @@ export function useAppState() {
         children: prev.children.map((c) => {
           if (c.id !== childId) return c;
           const bags = { ...c.bags };
+          const now = Date.now();
           for (const d of toDates) {
-            bags[d] = { items: { ...fromItems }, confirmed: false };
+            bags[d] = { items: { ...fromItems }, confirmed: false, updatedAt: now };
           }
-          return { ...c, bags, itemsUpdatedAt: Date.now() };
+          return { ...c, bags };
         }),
       };
       save(next);

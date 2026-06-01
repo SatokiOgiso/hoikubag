@@ -36,7 +36,7 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             );
             const active = c.id === state.currentChildId;
             const confirmed = !!bag.confirmed;
-            const editedLabel = relativeEditedAt(c.itemsUpdatedAt);
+            const editedLabel = relativeEditedAt(bag.updatedAt);
             return (
               <button
                 key={c.id}
