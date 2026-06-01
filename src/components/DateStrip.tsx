@@ -166,9 +166,9 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
                       ? 'bg-amber-100 text-amber-700'
                       : 'bg-red-100 text-red-600'
                   }`}
-                  title={`予報の信頼度 ${day.reliability}(A:高 〜 C:低)`}
+                  title={`予報信頼度 ${day.reliability}(A:高 〜 C:低)`}
                 >
-                  信頼度{day.reliability}
+                  予報信頼度{day.reliability}
                 </span>
               )}
               {isClosed ? (
