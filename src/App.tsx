@@ -8,9 +8,12 @@ import BagSummary from './components/BagSummary';
 import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 import AnalyticsModal from './components/AnalyticsModal';
+import AnalyticsIntro from './components/AnalyticsIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
+// 新機能「分析」のお知らせを一度だけ出すためのフラグ
+const FEATURE_ANALYTICS_KEY = 'hoiku-feature-analytics-v1';
 
 export default function App() {
   const {
@@ -29,6 +32,7 @@ export default function App() {
   } = useAppState();
   const [showSettings, setShowSettings] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showAnalyticsIntro, setShowAnalyticsIntro] = useState(false);
   // オンボーディング: 初回起動 or 設定からの再表示
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingFirstRun, setOnboardingFirstRun] = useState(false);
@@ -59,14 +63,35 @@ export default function App() {
     setShowOnboarding(true);
   }, [loading, familyId]);
 
+  // 新機能「分析」のお知らせ: 既にオンボーディング済みの既存ユーザーに一度だけ表示
+  useEffect(() => {
+    if (loading) return;
+    if (localStorage.getItem(FEATURE_ANALYTICS_KEY)) return;
+    // 新規ユーザーは初期設定フローを通るので二重に出さない(データのある既存ユーザーのみ)
+    const established = !!(familyId || localStorage.getItem(STORAGE_KEY));
+    if (!established || !localStorage.getItem(ONBOARDED_KEY)) return;
+    setShowAnalyticsIntro(true);
+  }, [loading, familyId]);
+
   const finishOnboarding = (data: OnboardingData) => {
     actions.applyOnboarding(data);
     localStorage.setItem(ONBOARDED_KEY, '1');
+    // 初期設定を終えた新規ユーザーには新機能お知らせを出さない
+    localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
     setShowOnboarding(false);
   };
   const closeOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, '1');
+    localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
     setShowOnboarding(false);
+  };
+  const dismissAnalyticsIntro = () => {
+    localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
+    setShowAnalyticsIntro(false);
+  };
+  const openAnalyticsFromIntro = () => {
+    dismissAnalyticsIntro();
+    setShowAnalytics(true);
   };
   const reopenOnboarding = () => {
     setOnboardingFirstRun(false);
@@ -228,6 +253,10 @@ export default function App() {
           items={allItems}
           onClose={() => setShowAnalytics(false)}
         />
+      )}
+
+      {showAnalyticsIntro && (
+        <AnalyticsIntro onOpen={openAnalyticsFromIntro} onClose={dismissAnalyticsIntro} />
       )}
 
       {showOnboarding && (
