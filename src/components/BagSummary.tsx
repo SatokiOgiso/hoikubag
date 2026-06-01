@@ -172,11 +172,11 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                   )}
                   {dayMemo && (
                     <div
-                      className={`mt-1.5 text-[12px] flex items-start gap-1 ${
-                        active ? 'text-white/70' : 'text-stone-500'
+                      className={`mt-1.5 text-[16px] flex items-start gap-1.5 ${
+                        active ? 'text-white/70' : 'text-stone-600'
                       }`}
                     >
-                      <MessageSquare size={11} className="mt-0.5 shrink-0" />
+                      <MessageSquare size={15} className="mt-1 shrink-0" />
                       <span className="break-words">{dayMemo}</span>
                     </div>
                   )}
