@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Forecast } from '../types';
 import { jstDateOffset, jstWeekday, jstWeekdayNum, nextDaycareDay } from '../lib/date';
-import { iconFromLabel } from '../lib/icons';
+import { weatherKinds, iconForKind, colorForKind } from '../lib/icons';
 
 interface Props {
   selectedDate: string;
@@ -48,14 +48,6 @@ function weekdayColor(wdNum: number): string {
   if (wdNum === 0) return 'text-red-500';
   if (wdNum === 6) return 'text-blue-500';
   return 'text-stone-500';
-}
-
-function weatherIconClass(label: string | undefined): string {
-  if (!label) return 'text-stone-400';
-  if (label.includes('晴')) return 'text-orange-400';
-  if (label.includes('雪')) return 'text-sky-300';
-  if (label.includes('雨')) return 'text-blue-400';
-  return 'text-stone-400';
 }
 
 /** 日付ストリップ(最上部・横スクロール・日付選択) */
@@ -115,7 +107,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
           const [, mm, dd] = date.split('-');
           const active = date === selectedDate;
           const day = byDate.get(date) ?? null;
-          const Icon = day ? iconFromLabel(day.label) : null;
+          const kinds = day ? weatherKinds(day.label) : [];
           const wdNum = jstWeekdayNum(date);
           const isClosed = closedWeekdays.includes(wdNum);
           const isHot = day?.high != null && day.high > threshold;
@@ -136,12 +128,25 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
               <span className="text-[22px] font-black leading-none text-stone-800">
                 {Number(mm)}/{Number(dd)}
               </span>
-              {Icon ? (
-                <Icon
-                  size={28}
-                  strokeWidth={1.6}
-                  className={`my-0.5 ${weatherIconClass(day?.label)}`}
-                />
+              {kinds.length > 0 ? (
+                <span className="my-0.5 h-7 flex items-center justify-center gap-0.5">
+                  {kinds.map((k, idx) => {
+                    const Ic = iconForKind(k);
+                    const single = kinds.length === 1;
+                    return (
+                      <span key={idx} className="flex items-center gap-0.5">
+                        {idx > 0 && (
+                          <span className="text-stone-300 text-[11px] leading-none">›</span>
+                        )}
+                        <Ic
+                          size={single ? 28 : 19}
+                          strokeWidth={1.6}
+                          className={colorForKind(k)}
+                        />
+                      </span>
+                    );
+                  })}
+                </span>
               ) : (
                 <span className="my-0.5 h-7" />
               )}
