@@ -154,6 +154,23 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
                   {day?.high != null ? `${day.high}°` : '—'}
                 </span>
               </span>
+              {/* 予報の信頼度(週間予報の A/B/C)。短期予報の日には付かない */}
+              {day?.reliability && (
+                <span
+                  className={`text-[10px] font-black leading-none px-1.5 py-0.5 rounded ${
+                    active
+                      ? 'bg-white/25 text-stone-700'
+                      : day.reliability === 'A'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : day.reliability === 'B'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-red-100 text-red-600'
+                  }`}
+                  title={`予報信頼度 ${day.reliability}(A:高 〜 C:低)`}
+                >
+                  予報信頼度{day.reliability}
+                </span>
+              )}
               {isClosed ? (
                 <span className={`text-[14px] font-black leading-none px-2 py-0.5 rounded-md ${active ? 'bg-orange-200/60 text-orange-700' : 'bg-stone-100 text-stone-400'}`}>
                   休
