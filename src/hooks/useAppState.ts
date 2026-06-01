@@ -195,11 +195,22 @@ export function useAppState() {
           items: { ...bag.items },
           confirmed: bag.confirmed,
           notes: bag.notes ? [...bag.notes] : undefined,
+          itemNotes: bag.itemNotes ? { ...bag.itemNotes } : undefined,
+          dayMemo: bag.dayMemo,
         });
         const bags = { ...c.bags };
-        // 空かつ未確定かつメモなしのかばんは保持しない(肥大化を避ける)
+        // 空かつ未確定かつメモ類なしのかばんは保持しない(肥大化を避ける)
         const hasNotes = nextBag.notes && nextBag.notes.length > 0;
-        if (Object.keys(nextBag.items).length === 0 && !nextBag.confirmed && !hasNotes) {
+        const hasItemNotes =
+          nextBag.itemNotes && Object.values(nextBag.itemNotes).some((v) => v.trim());
+        const hasDayMemo = !!nextBag.dayMemo?.trim();
+        if (
+          Object.keys(nextBag.items).length === 0 &&
+          !nextBag.confirmed &&
+          !hasNotes &&
+          !hasItemNotes &&
+          !hasDayMemo
+        ) {
           delete bags[date];
         } else {
           bags[date] = nextBag;
@@ -420,6 +431,37 @@ export function useAppState() {
       setState((s) => {
         if (!s) return s;
         const next = mapCurrentBag(s, date, (b) => ({ ...b, notes }));
+        save(next);
+        return next;
+      });
+    },
+    [mapCurrentBag, save]
+  );
+
+  /** 品目ごとのメモ(普段と違う個数の理由など)を設定。空文字でそのキーを削除 */
+  const changeItemNote = useCallback(
+    (date: string, key: string, note: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = mapCurrentBag(s, date, (b) => {
+          const itemNotes = { ...(b.itemNotes ?? {}) };
+          if (note.trim()) itemNotes[key] = note;
+          else delete itemNotes[key];
+          return { ...b, itemNotes };
+        });
+        save(next);
+        return next;
+      });
+    },
+    [mapCurrentBag, save]
+  );
+
+  /** その日全体のメモを設定 */
+  const changeDayMemo = useCallback(
+    (date: string, memo: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = mapCurrentBag(s, date, (b) => ({ ...b, dayMemo: memo }));
         save(next);
         return next;
       });
@@ -761,6 +803,8 @@ export function useAppState() {
       setLocation,
       setThreshold,
       changeNotes,
+      changeItemNote,
+      changeDayMemo,
       copyBag,
       setClosedWeekdays,
       fetchWeather,

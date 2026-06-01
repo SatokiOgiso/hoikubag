@@ -1,4 +1,4 @@
-import { Check, Clock } from 'lucide-react';
+import { Check, Clock, MessageSquare } from 'lucide-react';
 import type { AppState, Item } from '../types';
 import { getBag } from '../types';
 import { dateLabel, relativeEditedAt } from '../lib/date';
@@ -29,6 +29,8 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             const cItems = effectiveItems(c, date, state.closedWeekdays);
             const cTotal = Object.values(cItems).reduce((a, b) => a + b, 0);
             const cNotes = (bag.notes ?? []).filter((n) => n.trim().length > 0);
+            const dayMemo = bag.dayMemo?.trim() ?? '';
+            const itemNoteCount = Object.values(bag.itemNotes ?? {}).filter((v) => v.trim()).length;
             const active = c.id === state.currentChildId;
             const confirmed = !!bag.confirmed;
             const editedLabel = relativeEditedAt(c.itemsUpdatedAt);
@@ -130,6 +132,20 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
                           <span className="max-w-[108px] truncate">{n}</span>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {(dayMemo || itemNoteCount > 0) && (
+                    <div
+                      className={`mt-1.5 text-[12px] flex items-start gap-1 ${
+                        active ? 'text-white/70' : 'text-stone-500'
+                      }`}
+                    >
+                      <MessageSquare size={11} className="mt-0.5 shrink-0" />
+                      <span className="break-words">
+                        {dayMemo}
+                        {dayMemo && itemNoteCount > 0 ? ' / ' : ''}
+                        {itemNoteCount > 0 ? `品目メモ${itemNoteCount}件` : ''}
+                      </span>
                     </div>
                   )}
                   {editedLabel && (

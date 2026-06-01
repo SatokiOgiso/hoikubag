@@ -31,9 +31,16 @@ export function migrate(raw: unknown): AppState | null {
     if (!c.bags && c.items && Object.keys(c.items).length > 0) {
       bags = { [jstDateOffset(1)]: { items: c.items, confirmed: !!c.confirmed } };
     }
-    // 各 bag の items を保証
+    // 各 bag の items を保証(メモ類は保持)
     for (const d of Object.keys(bags)) {
-      bags[d] = { items: bags[d]?.items || {}, confirmed: !!bags[d]?.confirmed };
+      const b = bags[d] ?? {};
+      bags[d] = {
+        items: b.items || {},
+        confirmed: !!b.confirmed,
+        ...(Array.isArray(b.notes) ? { notes: b.notes } : {}),
+        ...(b.itemNotes && typeof b.itemNotes === 'object' ? { itemNotes: b.itemNotes } : {}),
+        ...(typeof b.dayMemo === 'string' ? { dayMemo: b.dayMemo } : {}),
+      };
     }
     return {
       id: c.id,
