@@ -209,7 +209,7 @@ export default function ItemList({
                   {!confirmed && (
                     <button
                       onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                      className={`w-9 h-9 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
                         localItemNotes[item.key]?.trim()
                           ? 'bg-stone-200 text-stone-600'
                           : 'bg-stone-100 text-stone-400'
