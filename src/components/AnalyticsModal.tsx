@@ -21,7 +21,7 @@ type Range = 'all' | 'month';
 type Target = 'everyone' | string; // 'everyone' か childId
 
 // バッジは指数的でなく一定間隔で定期的に獲得できるようにする
-const DAYS_STEP = 10;
+const DAYS_STEP = 5; // 5日ごとにメダル(初回のみ1日)
 const DAYS_FIRST = 1; // 初回だけ「はじめての準備」を1日で
 const ITEMS_STEP = 10;
 
@@ -107,6 +107,7 @@ export default function AnalyticsModal({ state, items, onClose }: Props) {
           {target === 'everyone' && multiChild ? (
             <EveryoneView
               statsByChild={statsByChild}
+              allTimeByChild={allTimeByChild}
               badgeCount={badgeCount}
               onSelectChild={setTarget}
             />
@@ -148,18 +149,21 @@ function SelectorPill({
   );
 }
 
-/* ---- みんな(全員)ビュー: 2人分の達成を1画面で ---- */
+/* ---- みんな(全員)ビュー: 全員分の達成・バッジを1画面で ---- */
 function EveryoneView({
   statsByChild,
+  allTimeByChild,
   badgeCount,
   onSelectChild,
 }: {
   statsByChild: ChildStats[];
+  allTimeByChild: ChildStats[];
   badgeCount: (s: ChildStats) => number;
   onSelectChild: (id: string) => void;
 }) {
   const totalDays = statsByChild.reduce((a, s) => a + s.days, 0);
   const totalItems = statsByChild.reduce((a, s) => a + s.totalItems, 0);
+  const allTimeOf = (id: string) => allTimeByChild.find((a) => a.childId === id)!;
   return (
     <div className="space-y-4">
       {/* 家族の合計バナー */}
@@ -177,26 +181,35 @@ function EveryoneView({
         </div>
       </div>
 
-      {/* 子どもごとのコンパクト達成カード */}
-      {statsByChild.map((s) => (
-        <button
-          key={s.childId}
-          onClick={() => onSelectChild(s.childId)}
-          className="w-full text-left bg-white rounded-2xl border border-stone-200 p-4 active:scale-[0.99] transition-all"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-black text-lg text-stone-800">{s.childName}</span>
-            <span className="flex items-center gap-1 text-stone-500 text-sm font-bold">
-              <Trophy size={15} style={{ color: ACCENT }} /> バッジ {badgeCount(s)}
-              <ChevronRight size={16} className="text-stone-300" />
-            </span>
+      {/* 子どもごとの達成カード(バッジも全員分表示) */}
+      {statsByChild.map((s) => {
+        const at = allTimeOf(s.childId);
+        return (
+          <div
+            key={s.childId}
+            className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-black text-lg text-stone-800">{s.childName}</span>
+              <button
+                onClick={() => onSelectChild(s.childId)}
+                className="flex items-center gap-1 text-stone-500 text-sm font-bold active:scale-95 transition-all"
+                aria-label={`${s.childName}の詳細を見る`}
+              >
+                <Trophy size={15} style={{ color: ACCENT }} /> バッジ {badgeCount(at)}
+                <ChevronRight size={16} className="text-stone-300" />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <MiniStat icon={<CalendarCheck size={16} />} value={s.days} unit="日 準備" />
+              <MiniStat icon={<Package size={16} />} value={s.totalItems} unit="個 用意" />
+            </div>
+            {/* 達成バッジ(全期間ベース) */}
+            <BadgeStrip label="準備した日数" value={at.days} unit="日" step={DAYS_STEP} first={DAYS_FIRST} />
+            <BadgeStrip label="用意したアイテム" value={at.totalItems} unit="個" step={ITEMS_STEP} />
           </div>
-          <div className="flex gap-2">
-            <MiniStat icon={<CalendarCheck size={16} />} value={s.days} unit="日 準備" />
-            <MiniStat icon={<Package size={16} />} value={s.totalItems} unit="個 用意" />
-          </div>
-        </button>
-      ))}
+        );
+      })}
     </div>
   );
 }
