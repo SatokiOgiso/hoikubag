@@ -50,13 +50,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 設定診断(値は返さず、有無のブール値のみ)。秘密は漏らさない。
+    // notify と同じ手順(送信は除く)を空実行して、どの段で例外が出るか調べる。
     if (req.method === 'GET' && action === 'diag') {
-      return res.status(200).json({
+      const out: Record<string, unknown> = {
         hasPublic: !!VAPID_PUBLIC,
         hasPrivate: !!VAPID_PRIVATE,
         hasKV: !!(KV_URL && KV_TOKEN),
         subject: VAPID_SUBJECT,
-      });
+      };
+      try {
+        if (VAPID_PUBLIC && VAPID_PRIVATE) {
+          webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+          out.vapidOk = true;
+        }
+      } catch (e) {
+        out.vapidErr = e instanceof Error ? e.message : String(e);
+      }
+      try {
+        const flat = await redis(['HGETALL', SUBS_KEY]);
+        out.subsType = Array.isArray(flat) ? 'array' : flat === null ? 'null' : typeof flat;
+        out.subsLen = Array.isArray(flat) ? flat.length : null;
+        if (Array.isArray(flat) && flat.length >= 2) {
+          // 1件目の値が JSON として読めるか・familyId の有無だけ確認(中身は出さない)
+          try {
+            const s = JSON.parse(flat[1]) as { familyId?: unknown };
+            out.firstParseOk = true;
+            out.firstHasFamilyId = s?.familyId != null;
+          } catch (e) {
+            out.firstParseErr = e instanceof Error ? e.message : String(e);
+          }
+        }
+      } catch (e) {
+        out.kvErr = e instanceof Error ? e.message : String(e);
+      }
+      return res.status(200).json(out);
     }
 
     if (req.method === 'POST') {
@@ -137,6 +164,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'method not allowed' });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'server error';
+    console.error('[api/push] error', { action, message, error: e });
     return res.status(500).json({ error: message });
   }
 }
