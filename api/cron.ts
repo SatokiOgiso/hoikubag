@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import webpush from 'web-push';
-import { redis, SUBS_KEY } from './push';
+import { redis, SUBS_KEY, toUrlSafeBase64 } from './push';
 
 /**
  * 毎晩の準備リマインドを全購読へ送信する Cron(vercel.json で時刻指定)。
@@ -75,7 +75,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
     return res.status(500).json({ error: 'VAPID 未設定' });
   }
-  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  webpush.setVapidDetails(
+    VAPID_SUBJECT,
+    toUrlSafeBase64(VAPID_PUBLIC),
+    toUrlSafeBase64(VAPID_PRIVATE)
+  );
 
   try {
     // push:subs ハッシュ全件(endpoint, value, endpoint, value, ...)
