@@ -58,6 +58,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ publicKey: VAPID_PUBLIC });
     }
 
+    // 一時診断: 購読の家族分布だけを返す(familyId そのものは返さない=秘密を漏らさない)。
+    if (req.method === 'GET' && action === 'diag') {
+      const flat = (await redis(['HGETALL', SUBS_KEY])) as string[] | null;
+      const groups = new Map<string, number>();
+      let total = 0;
+      let withoutFamily = 0;
+      for (let i = 0; flat && i < flat.length; i += 2) {
+        total++;
+        try {
+          const s = JSON.parse(flat[i + 1]) as StoredSub;
+          if (s.familyId) groups.set(s.familyId, (groups.get(s.familyId) ?? 0) + 1);
+          else withoutFamily++;
+        } catch {
+          withoutFamily++;
+        }
+      }
+      return res.status(200).json({
+        totalSubs: total,
+        withoutFamily,
+        distinctFamilies: groups.size,
+        groupSizes: [...groups.values()].sort((a, b) => b - a),
+      });
+    }
+
     if (req.method === 'POST') {
       const body =
         typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as Record<string, unknown>);
