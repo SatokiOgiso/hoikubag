@@ -21,7 +21,7 @@ type Range = 'all' | 'month';
 type Target = 'everyone' | string; // 'everyone' か childId
 
 // バッジは指数的でなく一定間隔で定期的に獲得できるようにする
-const DAYS_STEP = 10;
+const DAYS_STEP = 5; // 5日ごとにメダル(初回のみ1日)
 const DAYS_FIRST = 1; // 初回だけ「はじめての準備」を1日で
 const ITEMS_STEP = 10;
 
