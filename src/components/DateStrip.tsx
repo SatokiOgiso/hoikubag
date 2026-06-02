@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Forecast } from '../types';
 import { jstDateOffset, jstWeekday, jstWeekdayNum, nextDaycareDay } from '../lib/date';
 import { weatherKinds, iconForKind, colorForKind } from '../lib/icons';
+import { ACCENT } from '../constants';
 
 interface Props {
   selectedDate: string;
@@ -106,6 +107,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
           const rel = relativeLabel(date);
           const [, mm, dd] = date.split('-');
           const active = date === selectedDate;
+          const isToday = date === jstDateOffset(0);
           const day = byDate.get(date) ?? null;
           const kinds = day ? weatherKinds(day.label) : [];
           const wdNum = jstWeekdayNum(date);
@@ -120,9 +122,18 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
               className={`shrink-0 w-[96px] snap-center rounded-2xl py-3.5 flex flex-col items-center gap-1 transition-all active:scale-95 border ${
                 active ? 'shadow-sm' : 'bg-white text-stone-600 border-stone-200'
               }`}
-              style={active ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' } : undefined}
+              style={
+                active
+                  ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' }
+                  : isToday
+                  ? { borderColor: ACCENT, boxShadow: `inset 0 0 0 2px ${ACCENT}`, background: 'rgba(216,107,74,0.06)' }
+                  : undefined
+              }
             >
-              <span className={`text-[16px] font-bold ${weekdayColor(wdNum)}`}>
+              <span
+                className={`text-[16px] font-bold ${isToday ? '' : weekdayColor(wdNum)}`}
+                style={isToday ? { color: ACCENT } : undefined}
+              >
                 {rel || jstWeekday(date)}
               </span>
               <span className="text-[22px] font-black leading-none text-stone-800">
