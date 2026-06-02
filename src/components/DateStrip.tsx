@@ -124,15 +124,15 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
               }`}
               style={
                 active
-                  ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' }
+                  ? { borderColor: ACCENT, boxShadow: `inset 0 0 0 2px ${ACCENT}, 0 1px 2px rgba(0,0,0,0.06)`, background: 'rgba(216,107,74,0.06)' }
                   : isToday
-                  ? { borderColor: ACCENT, boxShadow: `inset 0 0 0 2px ${ACCENT}`, background: 'rgba(216,107,74,0.06)' }
+                  ? { background: 'linear-gradient(160deg, #FEF0DC, #FFF6E8)', borderColor: '#F5C99A' }
                   : undefined
               }
             >
               <span
-                className={`text-[16px] font-bold ${isToday ? '' : weekdayColor(wdNum)}`}
-                style={isToday ? { color: ACCENT } : undefined}
+                className={`text-[16px] font-bold ${active ? '' : weekdayColor(wdNum)}`}
+                style={active ? { color: ACCENT } : undefined}
               >
                 {rel || jstWeekday(date)}
               </span>
