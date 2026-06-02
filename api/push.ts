@@ -58,6 +58,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ publicKey: VAPID_PUBLIC });
     }
 
+    // 一時診断: 正規化後の VAPID 設定が通るか・宛先件数(送信はしない)
+    if (req.method === 'GET' && action === 'diag') {
+      const out: Record<string, unknown> = {};
+      try {
+        if (VAPID_PUBLIC && VAPID_PRIVATE) {
+          webpush.setVapidDetails(
+            VAPID_SUBJECT,
+            toUrlSafeBase64(VAPID_PUBLIC),
+            toUrlSafeBase64(VAPID_PRIVATE)
+          );
+          out.vapidOk = true;
+        }
+      } catch (e) {
+        out.vapidErr = e instanceof Error ? e.message : String(e);
+      }
+      const fam = Array.isArray(req.query.familyId) ? req.query.familyId[0] : req.query.familyId;
+      try {
+        const flat = (await redis(['HGETALL', SUBS_KEY])) as string[] | null;
+        let total = 0;
+        let match = 0;
+        for (let i = 0; flat && i < flat.length; i += 2) {
+          total++;
+          try {
+            const s = JSON.parse(flat[i + 1]) as StoredSub;
+            if (fam && s.familyId === fam) match++;
+          } catch {
+            /* skip */
+          }
+        }
+        out.totalSubs = total;
+        out.matchForFamily = fam ? match : null;
+      } catch (e) {
+        out.kvErr = e instanceof Error ? e.message : String(e);
+      }
+      return res.status(200).json(out);
+    }
+
     if (req.method === 'POST') {
       const body =
         typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as Record<string, unknown>);
