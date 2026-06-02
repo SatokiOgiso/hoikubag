@@ -70,6 +70,22 @@ export async function enablePush(familyId: string | null): Promise<void> {
 }
 
 /**
+ * すでに通知を購読済みの端末について、保存されている familyId を現在の値へ更新する。
+ * 通知許可は要求せず、購読が無ければ何もしない。
+ * (通知を有効化した後に家族共有へ参加/作成した場合でも、家族向け通知が届くようにする)
+ */
+export async function syncSubscriptionFamily(familyId: string | null): Promise<void> {
+  if (!pushSupported()) return;
+  const sub = await getSubscription();
+  if (!sub) return;
+  await fetch('/api/push?action=subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: sub.toJSON(), familyId }),
+  });
+}
+
+/**
  * 家族へ「かばんの中身を確定して」とお願いの通知を送る。
  * 同じ familyId の購読すべて(自分の端末は除く)に届く。
  * 送信できた件数を返す。
