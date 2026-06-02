@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Settings, RefreshCw, BarChart3 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
-import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS, STORAGE_KEY } from './constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
@@ -200,6 +200,7 @@ export default function App() {
           forecast={forecast}
           threshold={threshold}
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
+          rolloverMinutes={state.rolloverMinutes ?? DEFAULT_ROLLOVER}
           onSelectDate={setSelectedDate}
         />
 

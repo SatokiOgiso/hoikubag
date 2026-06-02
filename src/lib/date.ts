@@ -38,6 +38,47 @@ export function nextDaycareDay(closedWeekdays: number[], startOffset = 1): strin
   return jstDateOffset(startOffset); // 全曜日が休みのフォールバック
 }
 
+/** 現在の JST 時刻を 0:00 からの経過分(0〜1439)で返す */
+export function jstMinutesOfDay(base: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tokyo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(base);
+  const h = Number(parts.find((p) => p.type === 'hour')?.value);
+  const m = Number(parts.find((p) => p.type === 'minute')?.value);
+  return h * 60 + m;
+}
+
+/**
+ * 表示の切り替え時刻(分)を踏まえた既定の選択日。
+ * 切り替え時刻より前は当日から、以降は翌日からの「次の登園日」を返す。
+ * 例: 7:30(=450分)設定なら、朝7:30までは当日の準備、それ以降は次の登園日を初期表示。
+ */
+export function defaultSelectedDate(closedWeekdays: number[], rolloverMinutes: number): string {
+  const before = jstMinutesOfDay() < rolloverMinutes;
+  return nextDaycareDay(closedWeekdays, before ? 0 : 1);
+}
+
+/** 分(0〜1439)を "HH:MM" 文字列に整形 */
+export function minutesToHHMM(min: number): string {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(m / 60)).padStart(2, '0');
+  const mm = String(m % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+/** "HH:MM" を分に変換。不正な値なら NaN を返す。 */
+export function hhmmToMinutes(hhmm: string): number {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return NaN;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return NaN;
+  return h * 60 + min;
+}
+
 /** 「5月31日(日)」のような日付ラベル(JST基準)。相対語(昨日/今日/明日)も前置 */
 export function dateLabel(isoDate: string): string {
   const [, mm, dd] = isoDate.split('-');

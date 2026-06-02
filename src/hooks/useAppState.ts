@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppState, Child, Item, RecurringItem } from '../types';
-import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEMS } from '../constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS } from '../constants';
 import { matchesRecurring, appliesDefaults } from '../lib/recurring';
 import {
   createProvider,
@@ -14,7 +14,7 @@ import {
 } from '../lib/storage';
 
 import type { Forecast, DayBag } from '../types';
-import { uid, jstDateOffset, jstWeekdayNum, nextDaycareDay } from '../lib/date';
+import { uid, jstDateOffset, jstWeekdayNum, nextDaycareDay, defaultSelectedDate } from '../lib/date';
 import { fetchForecast } from '../lib/weather';
 
 export type SyncStatus = 'local' | 'ok' | 'error';
@@ -35,6 +35,7 @@ function initialState(): AppState {
     thresholdTemp: DEFAULT_THRESHOLD,
     customItems: [],
     closedWeekdays: DEFAULT_CLOSED_WEEKDAYS,
+    rolloverMinutes: DEFAULT_ROLLOVER,
     updatedAt: 0,
   };
 }
@@ -58,6 +59,8 @@ export function useAppState() {
   const stateRef = useRef<AppState | null>(null);
   // 画面復帰時の日付またぎ検知用に、最後に見た JST の「今日」を保持
   const todayRef = useRef<string>(jstDateOffset(0));
+  // 最後に算出した既定の選択日(切り替え時刻またぎを検知して追従するため)
+  const defaultRef = useRef<string>('');
   // 現在の永続化 Provider(共有の有無で差し替わる)
   const providerRef = useRef<StorageProvider>(createProvider(null));
 
@@ -91,9 +94,11 @@ export function useAppState() {
       setFamilyId(fid);
       setState(next);
       setLoading(false);
-      // 次の登園日をデフォルト選択
+      // 切り替え時刻を踏まえた既定の選択日を初期表示
       const closed = next.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
-      setSelectedDate(nextDaycareDay(closed));
+      const initialDefault = defaultSelectedDate(closed, next.rolloverMinutes ?? DEFAULT_ROLLOVER);
+      defaultRef.current = initialDefault;
+      setSelectedDate(initialDefault);
     })();
     return () => {
       active = false;
@@ -121,13 +126,20 @@ export function useAppState() {
     if (loading) return;
     const onVisible = async () => {
       if (document.hidden) return;
-      // 日付をまたいでいたら天気を取り直し、選択日が過去なら次の登園日へ進める
+      const closed = stateRef.current?.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
+      const rollover = stateRef.current?.rolloverMinutes ?? DEFAULT_ROLLOVER;
       const nowToday = jstDateOffset(0);
+      // 暦日をまたいでいたら天気を取り直す
       if (nowToday !== todayRef.current) {
         todayRef.current = nowToday;
         void fetchWeather();
-        const closed = stateRef.current?.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS;
-        setSelectedDate((prev) => (prev < nowToday ? nextDaycareDay(closed) : prev));
+      }
+      // 既定日(暦日 or 切り替え時刻)が変わったら、既定のまま/過去日のときは追従して進める
+      const nextDefault = defaultSelectedDate(closed, rollover);
+      if (nextDefault !== defaultRef.current) {
+        const prevDefault = defaultRef.current;
+        defaultRef.current = nextDefault;
+        setSelectedDate((prev) => (prev === prevDefault || prev < nowToday ? nextDefault : prev));
       }
       const cloud = providerRef.current instanceof KvStorageProvider;
       try {
@@ -425,6 +437,19 @@ export function useAppState() {
       setState((s) => {
         if (!s) return s;
         const next = { ...s, thresholdTemp };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  /** 表示の切り替え時刻(0時からの分)を設定 */
+  const setRolloverMinutes = useCallback(
+    (rolloverMinutes: number) => {
+      setState((s) => {
+        if (!s) return s;
+        const next = { ...s, rolloverMinutes };
         save(next);
         return next;
       });
@@ -809,6 +834,7 @@ export function useAppState() {
       toggleConfirm,
       setLocation,
       setThreshold,
+      setRolloverMinutes,
       changeNotes,
       changeItemNote,
       changeDayMemo,
