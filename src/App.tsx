@@ -207,7 +207,9 @@ export default function App() {
           state={state}
           items={allItems}
           date={selectedDate}
+          familyId={familyId}
           onSelectChild={actions.selectChild}
+          showToast={showToast}
         />
 
         <ItemList
