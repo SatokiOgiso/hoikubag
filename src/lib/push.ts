@@ -81,7 +81,16 @@ export async function requestFamilyConfirm(familyId: string): Promise<number> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ familyId, excludeEndpoint: sub?.endpoint ?? null }),
   });
-  if (!r.ok) throw new Error(`お願いの送信に失敗しました (HTTP ${r.status})`);
+  if (!r.ok) {
+    let detail = `HTTP ${r.status}`;
+    try {
+      const err = (await r.json()) as { error?: string };
+      if (err?.error) detail = err.error;
+    } catch {
+      /* JSON でなければステータスのみ */
+    }
+    throw new Error(`お願いの送信に失敗しました (${detail})`);
+  }
   const data = (await r.json()) as { sent?: number };
   return data.sent ?? 0;
 }

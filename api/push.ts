@@ -49,6 +49,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ publicKey: VAPID_PUBLIC });
     }
 
+    // 設定診断(値は返さず、有無のブール値のみ)。秘密は漏らさない。
+    if (req.method === 'GET' && action === 'diag') {
+      return res.status(200).json({
+        hasPublic: !!VAPID_PUBLIC,
+        hasPrivate: !!VAPID_PRIVATE,
+        hasKV: !!(KV_URL && KV_TOKEN),
+        subject: VAPID_SUBJECT,
+      });
+    }
+
     if (req.method === 'POST') {
       const body =
         typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as Record<string, unknown>);
