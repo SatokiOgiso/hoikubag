@@ -215,41 +215,39 @@ export default function App() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {/* 準備リスト — 種別ごとの件数 + 期限注意件数を表示するカード型ボタン */}
+              {/* 準備リスト — 常に「やること」ラベル + 種別件数 + 期限注意件数 */}
               <button
                 onClick={() => setShowPrepList(true)}
-                className={`h-14 rounded-2xl bg-white border border-stone-200 active:scale-95 transition-all flex items-center justify-center ${remainingTasks > 0 ? 'px-3' : 'w-14'}`}
+                className="min-h-[56px] rounded-2xl bg-white border border-stone-200 active:scale-95 transition-all flex flex-col items-center justify-center px-3 py-2 gap-0.5"
                 aria-label="準備リスト"
               >
                 {remainingTasks === 0 ? (
-                  <ClipboardList size={22} className="text-stone-600" />
+                  /* タスクなし: アイコン + ラベル */
+                  <>
+                    <ClipboardList size={18} className="text-stone-400" />
+                    <span className="text-[10px] font-bold text-stone-400 leading-none">やること</span>
+                  </>
                 ) : (
-                  <div className="flex flex-col items-start gap-0.5">
-                    {/* 種別ごとの件数(0件の種別は非表示) */}
-                    <div className="flex items-center gap-1 text-[13px] font-bold text-stone-700 leading-none">
-                      {taskByKind.buy > 0 && (
-                        <span>🛒{taskByKind.buy}</span>
-                      )}
+                  /* タスクあり: ラベル + 種別件数 + 期限注意 */
+                  <>
+                    <span className="text-[10px] font-bold text-stone-400 leading-none self-start">やること</span>
+                    <div className="flex items-center gap-1 text-[13px] font-bold text-stone-700 leading-none self-start">
+                      {taskByKind.buy > 0 && <span>🛒{taskByKind.buy}</span>}
                       {taskByKind.buy > 0 && (taskByKind.submit > 0 || taskByKind.other > 0) && (
                         <span className="text-stone-300 text-[10px]">·</span>
                       )}
-                      {taskByKind.submit > 0 && (
-                        <span>📄{taskByKind.submit}</span>
-                      )}
+                      {taskByKind.submit > 0 && <span>📄{taskByKind.submit}</span>}
                       {taskByKind.submit > 0 && taskByKind.other > 0 && (
                         <span className="text-stone-300 text-[10px]">·</span>
                       )}
-                      {taskByKind.other > 0 && (
-                        <span>📝{taskByKind.other}</span>
-                      )}
+                      {taskByKind.other > 0 && <span>📝{taskByKind.other}</span>}
                     </div>
-                    {/* 期限切れ/間近の件数(ある場合のみ) */}
                     {urgentCount > 0 && (
-                      <div className="text-[11px] font-bold text-red-500 leading-none">
+                      <div className="text-[11px] font-bold text-red-500 leading-none self-start">
                         ⚠️ {urgentCount}件 期限あり
                       </div>
                     )}
-                  </div>
+                  </>
                 )}
               </button>
               <button
