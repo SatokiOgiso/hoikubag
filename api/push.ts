@@ -85,9 +85,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 家族の誰かが「中身を確定して」と能動的にお願いを送る。
-      // 同じ familyId の購読すべて(送信者自身の端末も含む)へプッシュする。
+      // 同じ familyId の購読(送信者自身の端末は除く)へプッシュする。
       if (action === 'notify') {
         const familyId = body?.familyId as string | undefined;
+        const excludeEndpoint = (body?.excludeEndpoint as string | null) ?? null;
         if (!familyId) return res.status(400).json({ error: 'familyId required' });
         if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
           return res.status(500).json({ error: 'VAPID 未設定' });
@@ -110,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let removed = 0;
         for (let i = 0; flat && i < flat.length; i += 2) {
           const endpoint = flat[i];
+          if (endpoint === excludeEndpoint) continue;
           let stored: StoredSub;
           try {
             stored = JSON.parse(flat[i + 1]) as StoredSub;
