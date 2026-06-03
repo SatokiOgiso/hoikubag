@@ -190,8 +190,8 @@ export default function App() {
         {/* ヘッダー */}
         <header className="px-5 pt-1 pb-3">
           <div className="flex items-center justify-between">
-            {/* ロゴ */}
-            <div className="flex items-center gap-2">
+            {/* ロゴ(アイコン + テキストを縦積み) */}
+            <div className="flex flex-col items-center">
               <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
                 <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                   {/* ハンドル */}
@@ -210,7 +210,9 @@ export default function App() {
                   <rect x="82" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
                 </svg>
               </div>
-              <span className="text-2xl font-black text-stone-800 tracking-tight">hoikubag</span>
+              <span className="w-14 text-center text-[10px] font-black text-stone-400 tracking-tight leading-tight mt-0.5 select-none">
+                hoikubag
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {/* 準備リスト — 種別ごとの件数 + 期限注意件数を表示するカード型ボタン */}
