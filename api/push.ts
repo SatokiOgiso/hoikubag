@@ -58,30 +58,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ publicKey: VAPID_PUBLIC });
     }
 
-    // 一時診断: 購読の家族分布だけを返す(familyId そのものは返さない=秘密を漏らさない)。
-    if (req.method === 'GET' && action === 'diag') {
-      const flat = (await redis(['HGETALL', SUBS_KEY])) as string[] | null;
-      const groups = new Map<string, number>();
-      let total = 0;
-      let withoutFamily = 0;
-      for (let i = 0; flat && i < flat.length; i += 2) {
-        total++;
-        try {
-          const s = JSON.parse(flat[i + 1]) as StoredSub;
-          if (s.familyId) groups.set(s.familyId, (groups.get(s.familyId) ?? 0) + 1);
-          else withoutFamily++;
-        } catch {
-          withoutFamily++;
-        }
-      }
-      return res.status(200).json({
-        totalSubs: total,
-        withoutFamily,
-        distinctFamilies: groups.size,
-        groupSizes: [...groups.values()].sort((a, b) => b - a),
-      });
-    }
-
     if (req.method === 'POST') {
       const body =
         typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as Record<string, unknown>);
@@ -109,10 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 家族の誰かが「中身を確定して」と能動的にお願いを送る。
-      // 同じ familyId の購読すべて(送信者の端末は除く)へプッシュする。
+      // 同じ familyId の購読すべて(送信者自身の端末も含む)へプッシュする。
       if (action === 'notify') {
         const familyId = body?.familyId as string | undefined;
-        const excludeEndpoint = (body?.excludeEndpoint as string | null) ?? null;
         if (!familyId) return res.status(400).json({ error: 'familyId required' });
         if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
           return res.status(500).json({ error: 'VAPID 未設定' });
@@ -135,7 +110,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let removed = 0;
         for (let i = 0; flat && i < flat.length; i += 2) {
           const endpoint = flat[i];
-          if (endpoint === excludeEndpoint) continue;
           let stored: StoredSub;
           try {
             stored = JSON.parse(flat[i + 1]) as StoredSub;

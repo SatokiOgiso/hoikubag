@@ -87,15 +87,14 @@ export async function syncSubscriptionFamily(familyId: string | null): Promise<v
 
 /**
  * 家族へ「かばんの中身を確定して」とお願いの通知を送る。
- * 同じ familyId の購読すべて(自分の端末は除く)に届く。
+ * 同じ familyId の購読すべて(自分の端末も含む)に届く。
  * 送信できた件数を返す。
  */
 export async function requestFamilyConfirm(familyId: string): Promise<number> {
-  const sub = await getSubscription();
   const r = await fetch('/api/push?action=notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ familyId, excludeEndpoint: sub?.endpoint ?? null }),
+    body: JSON.stringify({ familyId }),
   });
   if (!r.ok) {
     let detail = `HTTP ${r.status}`;
