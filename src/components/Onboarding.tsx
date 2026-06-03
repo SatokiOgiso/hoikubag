@@ -17,6 +17,18 @@ interface Props {
   onClose: () => void;
 }
 
+function OnboardFeature({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
+  return (
+    <div className="flex items-start gap-3 bg-white rounded-2xl border border-stone-200 px-4 py-3">
+      <span className="text-2xl leading-none mt-0.5 shrink-0">{emoji}</span>
+      <div>
+        <div className="text-sm font-bold text-stone-800 mb-0.5">{title}</div>
+        <div className="text-xs text-stone-500 leading-relaxed">{desc}</div>
+      </div>
+    </div>
+  );
+}
+
 /** バッグのロゴ(ヘッダーと同じ意匠) */
 function BagLogo() {
   return (
@@ -93,16 +105,43 @@ export default function Onboarding({ state, isFirstRun, onComplete, onClose }: P
       {/* 本文 */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {step === 0 && (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-5">
-            <div className="w-28 h-28 rounded-3xl bg-sky-50 border border-sky-200 flex items-center justify-center">
+          <div className="max-w-md mx-auto flex flex-col items-center text-center gap-5 py-2">
+            <div className="w-24 h-24 rounded-3xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
               <BagLogo />
             </div>
-            <h1 className="text-3xl font-black text-stone-800 tracking-tight">hoikubag</h1>
-            <p className="text-stone-600 leading-relaxed font-medium">
-              毎日の保育園の持ち物を、かんたんに管理。
-              <br />
-              天気に合わせた服装の目安や、準備のリマインドも。
-            </p>
+            <div>
+              <h1 className="text-3xl font-black text-stone-800 tracking-tight mb-2">hoikubag</h1>
+              <p className="text-sm text-stone-600 leading-relaxed font-medium">
+                保育園の毎日をかんたんに管理する
+                <br />
+                家族向けアプリです。
+              </p>
+            </div>
+
+            {/* 機能紹介 */}
+            <div className="w-full space-y-2 text-left">
+              <OnboardFeature
+                emoji="🎒"
+                title="かばんの持ち物管理"
+                desc="天気に合わせた服装ガイド付き。毎日の持ち物をかんたん準備。きょうだいも一緒に管理できます。"
+              />
+              <OnboardFeature
+                emoji="📋"
+                title="やること・準備リスト"
+                desc="買い物・提出物・準備物を期限付きで登録。残り件数が常にヘッダーに表示されます。"
+              />
+              <OnboardFeature
+                emoji="📊"
+                title="準備の記録・統計"
+                desc="毎日の「確定」が記録として積み重なります。達成バッジや持ち物ランキングも確認できます。"
+              />
+              <OnboardFeature
+                emoji="👨‍👩‍👧"
+                title="家族で共有"
+                desc="招待リンクを共有するだけでパートナーと同期。「私がやる」で担当も表明できます。"
+              />
+            </div>
+
             <p className="text-xs text-stone-400">
               はじめに、かんたんな初期設定をしましょう(あとから変更できます)。
             </p>
