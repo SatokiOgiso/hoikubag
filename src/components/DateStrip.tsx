@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Forecast } from '../types';
-import { jstDateOffset, jstWeekday, jstWeekdayNum, nextDaycareDay } from '../lib/date';
+import { jstDateOffset, jstWeekday, jstWeekdayNum, defaultSelectedDate } from '../lib/date';
 import { weatherKinds, iconForKind, colorForKind } from '../lib/icons';
 import { ACCENT } from '../constants';
 
@@ -9,6 +9,7 @@ interface Props {
   forecast: Forecast | null;
   threshold: number;
   closedWeekdays: number[];
+  rolloverMinutes: number;
   onSelectDate: (date: string) => void;
 }
 
@@ -52,7 +53,7 @@ function weekdayColor(wdNum: number): string {
 }
 
 /** 日付ストリップ(最上部・横スクロール・日付選択) */
-export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, onSelectDate }: Props) {
+export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, rolloverMinutes, onSelectDate }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -79,7 +80,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
   const byDate = new Map((forecast?.days ?? []).map((d) => [d.date, d]));
 
   const goToNextDaycareDay = () => {
-    const next = nextDaycareDay(closedWeekdays, 1);
+    const next = defaultSelectedDate(closedWeekdays, rolloverMinutes);
     onSelectDate(next);
     // 再レンダー後に selectedRef が更新されてからスクロール
     requestAnimationFrame(() => {

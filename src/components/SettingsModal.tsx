@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle } from 'lucide-react';
 import type { AppState, Item, RecurringItem, RecurrenceType } from '../types';
 import type { SyncStatus } from '../hooks/useAppState';
-import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, ITEM_EMOJI_CHOICES } from '../constants';
+import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEM_EMOJI_CHOICES } from '../constants';
 import { shareUrlFor } from '../lib/storage';
-import { jstDateOffset } from '../lib/date';
+import { jstDateOffset, minutesToHHMM, hhmmToMinutes } from '../lib/date';
 import { ruleLabel } from '../lib/recurring';
 import ConfirmDialog, { type ConfirmOptions } from './ConfirmDialog';
 import NotificationSection from './NotificationSection';
@@ -30,6 +30,7 @@ interface Props {
     saveCurrentAsDefault: (date: string) => void;
     setLocation: (name: string) => void;
     setThreshold: (n: number) => void;
+    setRolloverMinutes: (n: number) => void;
     setClosedWeekdays: (days: number[]) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
@@ -785,6 +786,31 @@ export default function SettingsModal({
                   </button>
                 );
               })}
+            </div>
+          </section>
+
+          {/* 表示の切り替え時刻 */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-1">日付の切り替え時刻</h3>
+            <div className="text-xs text-stone-500 mb-2 leading-relaxed">
+              この時刻までは「当日」、過ぎると「次の登園日」を最初に表示します。朝までは当日の準備、それ以降は翌日の準備をすることが多い場合に合わせて調整してください。
+            </div>
+            <div className="bg-white rounded-xl p-4 border border-stone-200 flex items-center gap-3">
+              <input
+                type="time"
+                value={minutesToHHMM(state.rolloverMinutes ?? DEFAULT_ROLLOVER)}
+                onChange={(e) => {
+                  const m = hhmmToMinutes(e.target.value);
+                  if (!Number.isNaN(m)) actions.setRolloverMinutes(m);
+                }}
+                className="text-2xl font-black bg-stone-100 rounded-lg px-3 py-2 text-stone-800 focus:outline-none"
+              />
+              <div className="flex-1 text-sm text-stone-600 leading-relaxed">
+                <span className="font-bold text-stone-800">
+                  {minutesToHHMM(state.rolloverMinutes ?? DEFAULT_ROLLOVER)}
+                </span>
+                までは当日を表示し、以降は次の登園日を表示します
+              </div>
             </div>
           </section>
 
