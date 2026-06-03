@@ -26,12 +26,29 @@ export function incompleteTaskCount(tasks: PrepTask[]): number {
   return tasks.filter((t) => !t.done).length;
 }
 
+/** 種別ごとの未完了件数 */
+export function incompleteCountsByKind(tasks: PrepTask[]): Record<TaskKind, number> {
+  const counts: Record<TaskKind, number> = { buy: 0, submit: 0, other: 0 };
+  for (const t of tasks) {
+    if (!t.done) counts[t.kind]++;
+  }
+  return counts;
+}
+
 /** 期限切れ/間近の未完了タスクがあるか(バッジを目立たせる判定に使う) */
 export function hasUrgentTask(tasks: PrepTask[], today: string = jstDateOffset(0)): boolean {
   return tasks.some((t) => {
     const u = taskUrgency(t, today);
     return u === 'overdue' || u === 'soon';
   });
+}
+
+/** 期限切れ/間近の未完了タスクの件数 */
+export function urgentTaskCount(tasks: PrepTask[], today: string = jstDateOffset(0)): number {
+  return tasks.filter((t) => {
+    const u = taskUrgency(t, today);
+    return u === 'overdue' || u === 'soon';
+  }).length;
 }
 
 /** 期限までの残り日数(JST基準)。過去なら負。期限なしは null */

@@ -12,7 +12,7 @@ import AnalyticsIntro from './components/AnalyticsIntro';
 import PrepListModal from './components/PrepListModal';
 import PrepListIntro from './components/PrepListIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
-import { incompleteTaskCount, hasUrgentTask } from './lib/tasks';
+import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
@@ -165,10 +165,11 @@ export default function App() {
   // 標準品目 + ユーザー追加品目
   const allItems = [...ITEMS, ...state.customItems];
 
-  // 準備リストの残数(未完了)とバッジの緊急度
+  // 準備リストの残数(未完了)・種別内訳・緊急件数
   const tasks = state.tasks ?? [];
   const remainingTasks = incompleteTaskCount(tasks);
-  const urgentTasks = hasUrgentTask(tasks);
+  const taskByKind = incompleteCountsByKind(tasks);
+  const urgentCount = urgentTaskCount(tasks);
 
   return (
     <div className="min-h-screen pb-16">
@@ -212,22 +213,41 @@ export default function App() {
               <span className="text-2xl font-black text-stone-800 tracking-tight">hoikubag</span>
             </div>
             <div className="flex items-center gap-2">
-              {/* 準備リスト(買い物・提出物・やること)。残数バッジ付き */}
+              {/* 準備リスト — 種別ごとの件数 + 期限注意件数を表示するカード型ボタン */}
               <button
                 onClick={() => setShowPrepList(true)}
-                className="relative w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                className={`h-14 rounded-2xl bg-white border border-stone-200 active:scale-95 transition-all flex items-center justify-center ${remainingTasks > 0 ? 'px-3' : 'w-14'}`}
                 aria-label="準備リスト"
               >
-                <ClipboardList size={22} className="text-stone-600" />
-                {remainingTasks > 0 && (
-                  <span
-                    className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-white text-[11px] font-black flex items-center justify-center ${
-                      urgentTasks ? 'bg-red-500 ring-2 ring-white' : ''
-                    }`}
-                    style={urgentTasks ? undefined : { background: '#A8A29E' }}
-                  >
-                    {remainingTasks}
-                  </span>
+                {remainingTasks === 0 ? (
+                  <ClipboardList size={22} className="text-stone-600" />
+                ) : (
+                  <div className="flex flex-col items-start gap-0.5">
+                    {/* 種別ごとの件数(0件の種別は非表示) */}
+                    <div className="flex items-center gap-1 text-[13px] font-bold text-stone-700 leading-none">
+                      {taskByKind.buy > 0 && (
+                        <span>🛒{taskByKind.buy}</span>
+                      )}
+                      {taskByKind.buy > 0 && (taskByKind.submit > 0 || taskByKind.other > 0) && (
+                        <span className="text-stone-300 text-[10px]">·</span>
+                      )}
+                      {taskByKind.submit > 0 && (
+                        <span>📄{taskByKind.submit}</span>
+                      )}
+                      {taskByKind.submit > 0 && taskByKind.other > 0 && (
+                        <span className="text-stone-300 text-[10px]">·</span>
+                      )}
+                      {taskByKind.other > 0 && (
+                        <span>📝{taskByKind.other}</span>
+                      )}
+                    </div>
+                    {/* 期限切れ/間近の件数(ある場合のみ) */}
+                    {urgentCount > 0 && (
+                      <div className="text-[11px] font-bold text-red-500 leading-none">
+                        ⚠️ {urgentCount}件 期限あり
+                      </div>
+                    )}
+                  </div>
                 )}
               </button>
               <button
