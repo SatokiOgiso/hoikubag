@@ -69,6 +69,48 @@ export async function enablePush(familyId: string | null): Promise<void> {
   if (!r.ok) throw new Error(`購読の登録に失敗しました (HTTP ${r.status})`);
 }
 
+/**
+ * すでに通知を購読済みの端末について、保存されている familyId を現在の値へ更新する。
+ * 通知許可は要求せず、購読が無ければ何もしない。
+ * (通知を有効化した後に家族共有へ参加/作成した場合でも、家族向け通知が届くようにする)
+ */
+export async function syncSubscriptionFamily(familyId: string | null): Promise<void> {
+  if (!pushSupported()) return;
+  const sub = await getSubscription();
+  if (!sub) return;
+  await fetch('/api/push?action=subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: sub.toJSON(), familyId }),
+  });
+}
+
+/**
+ * 家族へ「かばんの中身を確定して」とお願いの通知を送る。
+ * 同じ familyId の購読(自分の端末は除く)に届く。
+ * 送信できた件数を返す。
+ */
+export async function requestFamilyConfirm(familyId: string): Promise<number> {
+  const sub = await getSubscription();
+  const r = await fetch('/api/push?action=notify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ familyId, excludeEndpoint: sub?.endpoint ?? null }),
+  });
+  if (!r.ok) {
+    let detail = `HTTP ${r.status}`;
+    try {
+      const err = (await r.json()) as { error?: string };
+      if (err?.error) detail = err.error;
+    } catch {
+      /* JSON でなければステータスのみ */
+    }
+    throw new Error(`お願いの送信に失敗しました (${detail})`);
+  }
+  const data = (await r.json()) as { sent?: number };
+  return data.sent ?? 0;
+}
+
 /** 通知を無効化する。サーバー登録解除 → ローカル購読解除 */
 export async function disablePush(): Promise<void> {
   const sub = await getSubscription();

@@ -10,6 +10,7 @@ import SettingsModal from './components/SettingsModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import AnalyticsIntro from './components/AnalyticsIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
+import { syncSubscriptionFamily } from './lib/push';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
 // 新機能「分析」のお知らせを一度だけ出すためのフラグ
@@ -49,6 +50,13 @@ export default function App() {
     document.documentElement.style.fontSize = `${fontScale * 16}px`;
     return () => { document.documentElement.style.fontSize = ''; };
   }, [fontScale]);
+
+  // 通知購読済みの端末は、現在の familyId を購読情報に同期しておく。
+  // (家族向けの確定お願い通知が確実に届くようにするため)
+  useEffect(() => {
+    if (loading) return;
+    syncSubscriptionFamily(familyId).catch(() => {});
+  }, [loading, familyId]);
 
   // 初回起動判定: まだオンボーディング未完了 かつ 既存データ/共有がない時だけ表示
   useEffect(() => {
@@ -207,7 +215,9 @@ export default function App() {
           state={state}
           items={allItems}
           date={selectedDate}
+          familyId={familyId}
           onSelectChild={actions.selectChild}
+          showToast={showToast}
         />
 
         <ItemList

@@ -1,18 +1,52 @@
-import { Check, Clock, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Clock, MessageSquare, Send } from 'lucide-react';
 import type { AppState, Item } from '../types';
 import { getBag } from '../types';
 import { dateLabel, relativeEditedAt } from '../lib/date';
 import { effectiveItems } from '../lib/recurring';
+import { requestFamilyConfirm } from '../lib/push';
 
 interface Props {
   state: AppState;
   items: Item[];
   date: string;
+  familyId: string | null;
   onSelectChild: (id: string) => void;
+  showToast: (msg: string) => void;
 }
 
 /** かばんサマリー(選択日・全員分・子ども切り替え兼用) */
-export default function BagSummary({ state, items, date, onSelectChild }: Props) {
+export default function BagSummary({
+  state,
+  items,
+  date,
+  familyId,
+  onSelectChild,
+  showToast,
+}: Props) {
+  const [requesting, setRequesting] = useState(false);
+
+  const handleRequestConfirm = async () => {
+    if (!familyId) {
+      showToast('家族共有を有効にすると、家族に確定をお願いできます');
+      return;
+    }
+    setRequesting(true);
+    try {
+      const sent = await requestFamilyConfirm(familyId);
+      showToast(
+        sent > 0
+          ? `家族に確定のお願いを送りました(${sent}件)`
+          : 'お願いの送信先が見つかりませんでした'
+      );
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'お願いの送信に失敗しました');
+    } finally {
+      // 連打防止に少し待ってから再度押せるようにする
+      setTimeout(() => setRequesting(false), 3000);
+    }
+  };
+
   return (
     <div className="px-5 mb-4">
       <div className="rounded-2xl bg-white border border-stone-200 p-4 shadow-sm">
@@ -195,6 +229,18 @@ export default function BagSummary({ state, items, date, onSelectChild }: Props)
             );
           })}
         </div>
+
+        {/* 全員ぶん共通: 家族へ「中身を確定して」とお願いを送るボタン */}
+        {familyId && (
+          <button
+            onClick={handleRequestConfirm}
+            disabled={requesting}
+            className="w-full mt-3 py-3.5 rounded-xl font-bold text-[16px] flex items-center justify-center gap-2 bg-white border-2 border-amber-300 text-amber-700 active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            <Send size={17} strokeWidth={2.5} />
+            {requesting ? '送信しました' : '家族に中身の確定をお願いする'}
+          </button>
+        )}
       </div>
     </div>
   );
