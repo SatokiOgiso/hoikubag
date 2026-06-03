@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppState, Child, Item, RecurringItem } from '../types';
+import type { AppState, Child, Item, RecurringItem, PrepTask } from '../types';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS } from '../constants';
 import { matchesRecurring, appliesDefaults } from '../lib/recurring';
 import {
@@ -701,6 +701,102 @@ export function useAppState() {
     [save, showToast, makeUndo]
   );
 
+  // ---- 準備リスト(買い物・提出物・やること)----
+
+  const addTask = useCallback(
+    (input: Omit<PrepTask, 'id' | 'createdAt' | 'updatedAt'>): boolean => {
+      if (!input.title.trim()) {
+        showToast('タイトルを入力してください');
+        return false;
+      }
+      setState((s) => {
+        if (!s) return s;
+        const now = Date.now();
+        const task: PrepTask = {
+          ...input,
+          title: input.title.trim(),
+          id: uid(),
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next: AppState = { ...s, tasks: [...(s.tasks ?? []), task] };
+        save(next);
+        return next;
+      });
+      showToast('準備リストに追加しました');
+      return true;
+    },
+    [save, showToast]
+  );
+
+  const updateTask = useCallback(
+    (task: PrepTask) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          tasks: (s.tasks ?? []).map((t) =>
+            t.id === task.id ? { ...task, title: task.title.trim(), updatedAt: Date.now() } : t
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  const removeTask = useCallback(
+    (id: string) => {
+      const prev = stateRef.current;
+      if (!prev) return;
+      const removed = (prev.tasks ?? []).find((t) => t.id === id);
+      const next: AppState = {
+        ...prev,
+        tasks: (prev.tasks ?? []).filter((t) => t.id !== id),
+      };
+      save(next);
+      showToast(`「${removed?.title ?? ''}」を削除しました`, makeUndo(prev));
+    },
+    [save, showToast, makeUndo]
+  );
+
+  const toggleTaskDone = useCallback(
+    (id: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          tasks: (s.tasks ?? []).map((t) =>
+            t.id === id ? { ...t, done: !t.done, updatedAt: Date.now() } : t
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  /** 「✋ 私がやる」/「手を下ろす」。空文字で担当をクリア */
+  const setTaskAssignee = useCallback(
+    (id: string, name: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const assignee = name.trim();
+        const next: AppState = {
+          ...s,
+          tasks: (s.tasks ?? []).map((t) =>
+            t.id === id ? { ...t, assignee: assignee || undefined, updatedAt: Date.now() } : t
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   // ---- 家族共有 ----
 
   /** 共有を開始: 新しい familyId を発行し、現在のデータをクラウドへアップロード */
@@ -846,6 +942,11 @@ export function useAppState() {
       addRecurringItem,
       updateRecurringItem,
       removeRecurringItem,
+      addTask,
+      updateTask,
+      removeTask,
+      toggleTaskDone,
+      setTaskAssignee,
       enableSharing,
       joinFamily,
       disableSharing,

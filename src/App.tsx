@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, RefreshCw, BarChart3 } from 'lucide-react';
+import { Settings, BarChart3, ClipboardList } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
@@ -9,12 +9,19 @@ import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import AnalyticsIntro from './components/AnalyticsIntro';
+import PrepListModal from './components/PrepListModal';
+import PrepListIntro from './components/PrepListIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
+import { incompleteTaskCount, hasUrgentTask } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
 // 新機能「分析」のお知らせを一度だけ出すためのフラグ
 const FEATURE_ANALYTICS_KEY = 'hoiku-feature-analytics-v1';
+// 新機能「準備リスト」のお知らせを一度だけ出すためのフラグ
+const FEATURE_PREPLIST_KEY = 'hoiku-feature-preplist-v1';
+// 端末ごとの自分の名前(担当の手挙げ用。同期しない)
+const MY_NAME_KEY = 'hoiku-my-name';
 
 export default function App() {
   const {
@@ -34,6 +41,13 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAnalyticsIntro, setShowAnalyticsIntro] = useState(false);
+  const [showPrepList, setShowPrepList] = useState(false);
+  const [showPrepListIntro, setShowPrepListIntro] = useState(false);
+  const [myName, setMyNameState] = useState<string>(() => localStorage.getItem(MY_NAME_KEY) ?? '');
+  const setMyName = (v: string) => {
+    setMyNameState(v);
+    localStorage.setItem(MY_NAME_KEY, v);
+  };
   // オンボーディング: 初回起動 or 設定からの再表示
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingFirstRun, setOnboardingFirstRun] = useState(false);
@@ -81,17 +95,39 @@ export default function App() {
     setShowAnalyticsIntro(true);
   }, [loading, familyId]);
 
+  // 新機能「準備リスト」のお知らせ: 既存ユーザーに一度だけ表示
+  // (分析のお知らせを済ませた後の起動で出す。重ねて表示しない)
+  useEffect(() => {
+    if (loading) return;
+    if (localStorage.getItem(FEATURE_PREPLIST_KEY)) return;
+    // 分析のお知らせがまだのユーザーには、そちらを先に出してから次回に回す
+    if (!localStorage.getItem(FEATURE_ANALYTICS_KEY)) return;
+    const established = !!(familyId || localStorage.getItem(STORAGE_KEY));
+    if (!established || !localStorage.getItem(ONBOARDED_KEY)) return;
+    setShowPrepListIntro(true);
+  }, [loading, familyId]);
+
   const finishOnboarding = (data: OnboardingData) => {
     actions.applyOnboarding(data);
     localStorage.setItem(ONBOARDED_KEY, '1');
     // 初期設定を終えた新規ユーザーには新機能お知らせを出さない
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
     setShowOnboarding(false);
   };
   const closeOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, '1');
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
     setShowOnboarding(false);
+  };
+  const dismissPrepListIntro = () => {
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
+    setShowPrepListIntro(false);
+  };
+  const openPrepListFromIntro = () => {
+    dismissPrepListIntro();
+    setShowPrepList(true);
   };
   const dismissAnalyticsIntro = () => {
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
@@ -128,6 +164,11 @@ export default function App() {
 
   // 標準品目 + ユーザー追加品目
   const allItems = [...ITEMS, ...state.customItems];
+
+  // 準備リストの残数(未完了)とバッジの緊急度
+  const tasks = state.tasks ?? [];
+  const remainingTasks = incompleteTaskCount(tasks);
+  const urgentTasks = hasUrgentTask(tasks);
 
   return (
     <div className="min-h-screen pb-16">
@@ -171,19 +212,24 @@ export default function App() {
               <span className="text-2xl font-black text-stone-800 tracking-tight">hoikubag</span>
             </div>
             <div className="flex items-center gap-2">
-              {state.location?.name && (
-                <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 h-14">
-                  <span className="text-[15px] text-stone-500 font-bold">📍 {state.location.name}</span>
-                  <button
-                    onClick={() => actions.fetchWeather()}
-                    disabled={weatherLoading}
-                    className="text-stone-400 active:scale-90 transition-all disabled:opacity-50"
-                    aria-label="天気を再取得"
+              {/* 準備リスト(買い物・提出物・やること)。残数バッジ付き */}
+              <button
+                onClick={() => setShowPrepList(true)}
+                className="relative w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="準備リスト"
+              >
+                <ClipboardList size={22} className="text-stone-600" />
+                {remainingTasks > 0 && (
+                  <span
+                    className={`absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-white text-[11px] font-black flex items-center justify-center ${
+                      urgentTasks ? 'bg-red-500 ring-2 ring-white' : ''
+                    }`}
+                    style={urgentTasks ? undefined : { background: '#A8A29E' }}
                   >
-                    <RefreshCw size={15} className={weatherLoading ? 'animate-spin' : ''} />
-                  </button>
-                </div>
-              )}
+                    {remainingTasks}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => setShowAnalytics(true)}
                 className="w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
@@ -210,6 +256,9 @@ export default function App() {
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           rolloverMinutes={state.rolloverMinutes ?? DEFAULT_ROLLOVER}
           onSelectDate={setSelectedDate}
+          locationName={state.location?.name}
+          weatherLoading={weatherLoading}
+          onRefreshWeather={() => actions.fetchWeather()}
         />
 
         <BagSummary
@@ -268,6 +317,21 @@ export default function App() {
 
       {showAnalyticsIntro && (
         <AnalyticsIntro onOpen={openAnalyticsFromIntro} onClose={dismissAnalyticsIntro} />
+      )}
+
+      {showPrepList && (
+        <PrepListModal
+          state={state}
+          myName={myName}
+          onSetMyName={setMyName}
+          showToast={showToast}
+          onClose={() => setShowPrepList(false)}
+          actions={actions}
+        />
+      )}
+
+      {showPrepListIntro && (
+        <PrepListIntro onOpen={openPrepListFromIntro} onClose={dismissPrepListIntro} />
       )}
 
       {showOnboarding && (

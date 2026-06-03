@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { RefreshCw } from 'lucide-react';
 import type { Forecast } from '../types';
 import { jstDateOffset, jstWeekday, jstWeekdayNum, defaultSelectedDate } from '../lib/date';
 import { weatherKinds, iconForKind, colorForKind } from '../lib/icons';
@@ -11,6 +12,9 @@ interface Props {
   closedWeekdays: number[];
   rolloverMinutes: number;
   onSelectDate: (date: string) => void;
+  locationName?: string;
+  weatherLoading?: boolean;
+  onRefreshWeather?: () => void;
 }
 
 const INITIAL_MAX = 30;
@@ -53,7 +57,7 @@ function weekdayColor(wdNum: number): string {
 }
 
 /** 日付ストリップ(最上部・横スクロール・日付選択) */
-export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, rolloverMinutes, onSelectDate }: Props) {
+export default function DateStrip({ selectedDate, forecast, threshold, closedWeekdays, rolloverMinutes, onSelectDate, locationName, weatherLoading, onRefreshWeather }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -92,12 +96,30 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
     <div className="px-5 pt-2 pb-3">
       <div className="flex items-center justify-between mb-2 px-1">
         <div className="text-[15px] tracking-[0.3em] text-stone-400 font-bold">日付を選ぶ</div>
-        <button
-          onClick={goToNextDaycareDay}
-          className="text-[13px] font-bold text-stone-500 bg-white border border-stone-200 rounded-xl px-3 py-1 active:scale-95 transition-all"
-        >
-          次の登園日
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 市町村(あまり変わらないので控えめに)+ 天気の更新ボタン */}
+          {locationName && (
+            <div className="flex items-center gap-1 text-[11px] text-stone-400 font-bold">
+              <span className="truncate max-w-[7rem]">📍 {locationName}</span>
+              {onRefreshWeather && (
+                <button
+                  onClick={onRefreshWeather}
+                  disabled={weatherLoading}
+                  className="text-stone-300 active:scale-90 transition-all disabled:opacity-50"
+                  aria-label="天気を再取得"
+                >
+                  <RefreshCw size={12} className={weatherLoading ? 'animate-spin' : ''} />
+                </button>
+              )}
+            </div>
+          )}
+          <button
+            onClick={goToNextDaycareDay}
+            className="text-[13px] font-bold text-stone-500 bg-white border border-stone-200 rounded-xl px-3 py-1 active:scale-95 transition-all"
+          >
+            次の登園日
+          </button>
+        </div>
       </div>
       <div
         ref={scrollRef}

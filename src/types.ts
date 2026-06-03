@@ -68,6 +68,23 @@ export interface Forecast {
   amedasName?: string | null;
 }
 
+/** 準備リスト(買い物・提出物・やること)のタスク種別 */
+export type TaskKind = 'buy' | 'submit' | 'other'; // 買い物 / 提出物 / その他
+
+/** 準備リストの1件(かばんとは別の、買い物・提出物などのタスク) */
+export interface PrepTask {
+  id: string;
+  title: string; // 自由記述のタイトル(必須)
+  kind: TaskKind;
+  memo?: string; // 詳細メモ
+  dueDate?: string; // 期限 YYYY-MM-DD(提出期限/準備期限)
+  childIds?: ChildId[]; // 対象の子(タグ)。空=みんな/共通
+  assignee?: string; // 手を挙げた人の名前(空=未定)
+  done?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AppState {
   children: Child[];
   currentChildId: ChildId;
@@ -76,6 +93,7 @@ export interface AppState {
   customItems: Item[]; // ユーザーが追加した品目(バスタオルなど)
   closedWeekdays: number[]; // 保育園のない曜日 0=日..6=土, デフォルト [0,6]
   rolloverMinutes?: number; // 表示の切り替え時刻(0時からの分)。既定 450(=7:30)
+  tasks?: PrepTask[]; // 準備リスト(買い物・提出物・やること)。既存ユーザー向けに optional
   updatedAt: number; // 競合解決用タイムスタンプ
 }
 
