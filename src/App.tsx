@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, RefreshCw, BarChart3 } from 'lucide-react';
+import { Settings, BarChart3, ClipboardList } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
@@ -9,12 +9,19 @@ import ItemList from './components/ItemList';
 import SettingsModal from './components/SettingsModal';
 import AnalyticsModal from './components/AnalyticsModal';
 import AnalyticsIntro from './components/AnalyticsIntro';
+import PrepListModal from './components/PrepListModal';
+import PrepListIntro from './components/PrepListIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
+import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
 // 新機能「分析」のお知らせを一度だけ出すためのフラグ
 const FEATURE_ANALYTICS_KEY = 'hoiku-feature-analytics-v1';
+// 新機能「準備リスト」のお知らせを一度だけ出すためのフラグ
+const FEATURE_PREPLIST_KEY = 'hoiku-feature-preplist-v1';
+// 端末ごとの自分の名前(担当の手挙げ用。同期しない)
+const MY_NAME_KEY = 'hoiku-my-name';
 
 export default function App() {
   const {
@@ -34,6 +41,13 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAnalyticsIntro, setShowAnalyticsIntro] = useState(false);
+  const [showPrepList, setShowPrepList] = useState(false);
+  const [showPrepListIntro, setShowPrepListIntro] = useState(false);
+  const [myName, setMyNameState] = useState<string>(() => localStorage.getItem(MY_NAME_KEY) ?? '');
+  const setMyName = (v: string) => {
+    setMyNameState(v);
+    localStorage.setItem(MY_NAME_KEY, v);
+  };
   // オンボーディング: 初回起動 or 設定からの再表示
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingFirstRun, setOnboardingFirstRun] = useState(false);
@@ -81,17 +95,39 @@ export default function App() {
     setShowAnalyticsIntro(true);
   }, [loading, familyId]);
 
+  // 新機能「準備リスト」のお知らせ: 既存ユーザーに一度だけ表示
+  // (分析のお知らせを済ませた後の起動で出す。重ねて表示しない)
+  useEffect(() => {
+    if (loading) return;
+    if (localStorage.getItem(FEATURE_PREPLIST_KEY)) return;
+    // 分析のお知らせがまだのユーザーには、そちらを先に出してから次回に回す
+    if (!localStorage.getItem(FEATURE_ANALYTICS_KEY)) return;
+    const established = !!(familyId || localStorage.getItem(STORAGE_KEY));
+    if (!established || !localStorage.getItem(ONBOARDED_KEY)) return;
+    setShowPrepListIntro(true);
+  }, [loading, familyId]);
+
   const finishOnboarding = (data: OnboardingData) => {
     actions.applyOnboarding(data);
     localStorage.setItem(ONBOARDED_KEY, '1');
     // 初期設定を終えた新規ユーザーには新機能お知らせを出さない
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
     setShowOnboarding(false);
   };
   const closeOnboarding = () => {
     localStorage.setItem(ONBOARDED_KEY, '1');
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
     setShowOnboarding(false);
+  };
+  const dismissPrepListIntro = () => {
+    localStorage.setItem(FEATURE_PREPLIST_KEY, '1');
+    setShowPrepListIntro(false);
+  };
+  const openPrepListFromIntro = () => {
+    dismissPrepListIntro();
+    setShowPrepList(true);
   };
   const dismissAnalyticsIntro = () => {
     localStorage.setItem(FEATURE_ANALYTICS_KEY, '1');
@@ -129,6 +165,12 @@ export default function App() {
   // 標準品目 + ユーザー追加品目
   const allItems = [...ITEMS, ...state.customItems];
 
+  // 準備リストの残数(未完了)・種別内訳・緊急件数
+  const tasks = state.tasks ?? [];
+  const remainingTasks = incompleteTaskCount(tasks);
+  const taskByKind = incompleteCountsByKind(tasks);
+  const urgentCount = urgentTaskCount(tasks);
+
   return (
     <div className="min-h-screen pb-16">
       {/* 背景の薄いドットパターン */}
@@ -148,8 +190,8 @@ export default function App() {
         {/* ヘッダー */}
         <header className="px-5 pt-1 pb-3">
           <div className="flex items-center justify-between">
-            {/* ロゴ */}
-            <div className="flex items-center gap-2">
+            {/* ロゴ(アイコン + テキストを縦積み) */}
+            <div className="flex flex-col items-center">
               <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shrink-0">
                 <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
                   {/* ハンドル */}
@@ -168,22 +210,46 @@ export default function App() {
                   <rect x="82" y="50" width="12" height="20" rx="6" fill="#E8B010"/>
                 </svg>
               </div>
-              <span className="text-2xl font-black text-stone-800 tracking-tight">hoikubag</span>
+              <span className="w-14 text-center text-[10px] font-black text-stone-400 tracking-tight leading-tight mt-0.5 select-none">
+                hoikubag
+              </span>
             </div>
             <div className="flex items-center gap-2">
-              {state.location?.name && (
-                <div className="flex items-center gap-2 bg-white border border-stone-200 rounded-2xl px-3 h-14">
-                  <span className="text-[15px] text-stone-500 font-bold">📍 {state.location.name}</span>
-                  <button
-                    onClick={() => actions.fetchWeather()}
-                    disabled={weatherLoading}
-                    className="text-stone-400 active:scale-90 transition-all disabled:opacity-50"
-                    aria-label="天気を再取得"
-                  >
-                    <RefreshCw size={15} className={weatherLoading ? 'animate-spin' : ''} />
-                  </button>
-                </div>
-              )}
+              {/* 準備リスト — 常に「やること」ラベル + 種別件数 + 期限注意件数 */}
+              <button
+                onClick={() => setShowPrepList(true)}
+                className="min-h-[56px] rounded-2xl bg-white border border-stone-200 active:scale-95 transition-all flex flex-col items-center justify-center px-3 py-2 gap-0.5"
+                aria-label="準備リスト"
+              >
+                {remainingTasks === 0 ? (
+                  /* タスクなし: アイコン + ラベル */
+                  <>
+                    <ClipboardList size={18} className="text-stone-400" />
+                    <span className="text-[10px] font-bold text-stone-400 leading-none">やること</span>
+                  </>
+                ) : (
+                  /* タスクあり: ラベル + 種別件数 + 期限注意 */
+                  <>
+                    <span className="text-[10px] font-bold text-stone-400 leading-none self-start">やること</span>
+                    <div className="flex items-center gap-1 text-[13px] font-bold text-stone-700 leading-none self-start">
+                      {taskByKind.buy > 0 && <span>🛒{taskByKind.buy}</span>}
+                      {taskByKind.buy > 0 && (taskByKind.submit > 0 || taskByKind.other > 0) && (
+                        <span className="text-stone-300 text-[10px]">·</span>
+                      )}
+                      {taskByKind.submit > 0 && <span>📄{taskByKind.submit}</span>}
+                      {taskByKind.submit > 0 && taskByKind.other > 0 && (
+                        <span className="text-stone-300 text-[10px]">·</span>
+                      )}
+                      {taskByKind.other > 0 && <span>📝{taskByKind.other}</span>}
+                    </div>
+                    {urgentCount > 0 && (
+                      <div className="text-[11px] font-bold text-red-500 leading-none self-start">
+                        ⚠️ {urgentCount}件 期限あり
+                      </div>
+                    )}
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => setShowAnalytics(true)}
                 className="w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
@@ -210,6 +276,9 @@ export default function App() {
           closedWeekdays={state.closedWeekdays ?? DEFAULT_CLOSED_WEEKDAYS}
           rolloverMinutes={state.rolloverMinutes ?? DEFAULT_ROLLOVER}
           onSelectDate={setSelectedDate}
+          locationName={state.location?.name}
+          weatherLoading={weatherLoading}
+          onRefreshWeather={() => actions.fetchWeather()}
         />
 
         <BagSummary
@@ -268,6 +337,21 @@ export default function App() {
 
       {showAnalyticsIntro && (
         <AnalyticsIntro onOpen={openAnalyticsFromIntro} onClose={dismissAnalyticsIntro} />
+      )}
+
+      {showPrepList && (
+        <PrepListModal
+          state={state}
+          myName={myName}
+          onSetMyName={setMyName}
+          showToast={showToast}
+          onClose={() => setShowPrepList(false)}
+          actions={actions}
+        />
+      )}
+
+      {showPrepListIntro && (
+        <PrepListIntro onOpen={openPrepListFromIntro} onClose={dismissPrepListIntro} />
       )}
 
       {showOnboarding && (
