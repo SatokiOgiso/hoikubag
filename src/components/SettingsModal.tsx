@@ -34,6 +34,7 @@ interface Props {
     setClosedWeekdays: (days: number[]) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
     removeCustomItem: (key: string) => void;
+    setCustomItemEmoji: (key: string, emoji: string) => void;
     addRecurringItem: (childId: string, rule: Omit<RecurringItem, 'id'>) => boolean;
     removeRecurringItem: (childId: string, ruleId: string) => void;
     enableSharing: () => void;
@@ -62,6 +63,8 @@ export default function SettingsModal({
   const [copied, setCopied] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemEmoji, setNewItemEmoji] = useState(ITEM_EMOJI_CHOICES[0]);
+  // 絵文字を変更中の追加品目のキー(null=なし)
+  const [editingEmojiKey, setEditingEmojiKey] = useState<string | null>(null);
   const [joinInput, setJoinInput] = useState('');
   const [joinLoading, setJoinLoading] = useState(false);
   const currentChild = state.children.find((c) => c.id === state.currentChildId);
@@ -225,30 +228,63 @@ export default function SettingsModal({
               リストにない持ち物(バスタオルなど)を追加できます。全員のリストに表示されます。
             </div>
 
-            {/* 追加した品目の一覧(削除可) */}
+            {/* 追加した品目の一覧(絵文字変更・削除可) */}
             {state.customItems.length > 0 && (
               <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100 mb-2">
                 {state.customItems.map((item) => (
-                  <div key={item.key} className="flex items-center gap-2 px-3 py-2">
-                    <div className="text-xl w-7 text-center">{item.emoji}</div>
-                    <div className="flex-1 text-sm font-bold text-stone-700">{item.key}</div>
-                    <button
-                      onClick={() =>
-                        askConfirm(
-                          {
-                            title: `「${item.key}」を削除しますか?`,
-                            message: '全員のリストと、入力済みの各日付からこの品目が取り除かれます。',
-                            confirmLabel: '削除する',
-                            destructive: true,
-                          },
-                          () => actions.removeCustomItem(item.key)
-                        )
-                      }
-                      className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center"
-                      aria-label={`${item.key}を削除`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                  <div key={item.key}>
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      {/* 絵文字(タップで変更) */}
+                      <button
+                        onClick={() =>
+                          setEditingEmojiKey((k) => (k === item.key ? null : item.key))
+                        }
+                        className={`text-xl w-9 h-9 rounded-lg flex items-center justify-center active:scale-90 transition-all ${
+                          editingEmojiKey === item.key ? 'bg-stone-100 ring-2 ring-stone-300' : 'hover:bg-stone-50'
+                        }`}
+                        aria-label={`${item.key}の絵文字を変更`}
+                      >
+                        {item.emoji}
+                      </button>
+                      <div className="flex-1 text-sm font-bold text-stone-700">{item.key}</div>
+                      <button
+                        onClick={() =>
+                          askConfirm(
+                            {
+                              title: `「${item.key}」を削除しますか?`,
+                              message: '全員のリストと、入力済みの各日付からこの品目が取り除かれます。',
+                              confirmLabel: '削除する',
+                              destructive: true,
+                            },
+                            () => actions.removeCustomItem(item.key)
+                          )
+                        }
+                        className="w-9 h-9 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center"
+                        aria-label={`${item.key}を削除`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    {/* 絵文字ピッカー(展開時) */}
+                    {editingEmojiKey === item.key && (
+                      <div className="px-3 pb-3 flex flex-wrap gap-1">
+                        {ITEM_EMOJI_CHOICES.map((e) => (
+                          <button
+                            key={e}
+                            onClick={() => {
+                              actions.setCustomItemEmoji(item.key, e);
+                              setEditingEmojiKey(null);
+                            }}
+                            className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center active:scale-90 transition-all ${
+                              item.emoji === e ? 'bg-stone-800 ring-2 ring-stone-800' : 'bg-stone-100'
+                            }`}
+                            aria-label={`絵文字 ${e}`}
+                          >
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

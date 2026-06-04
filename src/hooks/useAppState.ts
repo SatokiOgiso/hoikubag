@@ -631,6 +631,22 @@ export function useAppState() {
     [save, showToast, makeUndo]
   );
 
+  /** 追加した品目の絵文字を変更 */
+  const setCustomItemEmoji = useCallback(
+    (key: string, emoji: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          customItems: s.customItems.map((i) => (i.key === key ? { ...i, emoji } : i)),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   // ---- 定期的な持ち物 ----
 
   const addRecurringItem = useCallback(
@@ -965,6 +981,7 @@ export function useAppState() {
       fetchWeather,
       addCustomItem,
       removeCustomItem,
+      setCustomItemEmoji,
       addRecurringItem,
       updateRecurringItem,
       removeRecurringItem,
