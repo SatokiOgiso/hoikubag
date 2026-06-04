@@ -73,6 +73,16 @@ export function dueLabel(dueDate: string | undefined, today: string = jstDateOff
   return `${md}まで`;
 }
 
+/** 「いつやる」予定日の表示ラベル。例: "今日やる" "明日やる" "6/8 にやる" */
+export function planLabel(when: string | undefined, today: string = jstDateOffset(0)): string {
+  if (!when) return '';
+  const [, mm, dd] = when.split('-');
+  const md = `${Number(mm)}/${Number(dd)}`;
+  if (when === today) return '今日やる';
+  if (when === jstDateOffset(1)) return '明日やる';
+  return `${md} にやる`;
+}
+
 export const KIND_LABEL: Record<TaskKind, string> = {
   buy: '買い物',
   submit: '提出物',

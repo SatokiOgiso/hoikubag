@@ -778,7 +778,7 @@ export function useAppState() {
     [save]
   );
 
-  /** 「✋ 私がやる」/「手を下ろす」。空文字で担当をクリア */
+  /** 「✋ 私がやる」/「手を下ろす」。空文字で担当をクリア(やる予定日も一緒にクリア) */
   const setTaskAssignee = useCallback(
     (id: string, name: string) => {
       setState((s) => {
@@ -787,7 +787,33 @@ export function useAppState() {
         const next: AppState = {
           ...s,
           tasks: (s.tasks ?? []).map((t) =>
-            t.id === id ? { ...t, assignee: assignee || undefined, updatedAt: Date.now() } : t
+            t.id === id
+              ? {
+                  ...t,
+                  assignee: assignee || undefined,
+                  // 担当を外したら予定日も消す
+                  assigneeWhen: assignee ? t.assigneeWhen : undefined,
+                  updatedAt: Date.now(),
+                }
+              : t
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  /** 担当者の「いつやる」予定日を設定。空文字でクリア */
+  const setTaskWhen = useCallback(
+    (id: string, when: string) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          tasks: (s.tasks ?? []).map((t) =>
+            t.id === id ? { ...t, assigneeWhen: when || undefined, updatedAt: Date.now() } : t
           ),
         };
         save(next);
@@ -947,6 +973,7 @@ export function useAppState() {
       removeTask,
       toggleTaskDone,
       setTaskAssignee,
+      setTaskWhen,
       enableSharing,
       joinFamily,
       disableSharing,

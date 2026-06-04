@@ -80,6 +80,7 @@ export interface PrepTask {
   dueDate?: string; // 期限 YYYY-MM-DD(提出期限/準備期限)
   childIds?: ChildId[]; // 対象の子(タグ)。空=みんな/共通
   assignee?: string; // 手を挙げた人の名前(空=未定)
+  assigneeWhen?: string; // 担当者がいつやる予定か(YYYY-MM-DD)
   done?: boolean;
   createdAt: number;
   updatedAt: number;

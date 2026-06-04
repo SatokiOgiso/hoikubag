@@ -5,6 +5,7 @@ import { ACCENT } from '../constants';
 import {
   taskUrgency,
   dueLabel,
+  planLabel,
   sortTasks,
   KIND_LABEL,
   KIND_EMOJI,
@@ -23,6 +24,7 @@ interface Props {
     removeTask: (id: string) => void;
     toggleTaskDone: (id: string) => void;
     setTaskAssignee: (id: string, name: string) => void;
+    setTaskWhen: (id: string, when: string) => void;
     addCustomItem: (name: string, emoji: string) => boolean;
   };
 }
@@ -190,6 +192,7 @@ export default function PrepListModal({
                 onDelete={() => actions.removeTask(t.id)}
                 onRaiseHand={() => raiseHand(t)}
                 onLowerHand={() => actions.setTaskAssignee(t.id, '')}
+                onSetWhen={(w) => actions.setTaskWhen(t.id, w)}
               />
             ))}
           </div>
@@ -211,6 +214,7 @@ export default function PrepListModal({
                     onDelete={() => actions.removeTask(t.id)}
                     onRaiseHand={() => raiseHand(t)}
                     onLowerHand={() => actions.setTaskAssignee(t.id, '')}
+                    onSetWhen={(w) => actions.setTaskWhen(t.id, w)}
                   />
                 ))}
               </div>
@@ -319,6 +323,7 @@ function TaskCard({
   onDelete,
   onRaiseHand,
   onLowerHand,
+  onSetWhen,
 }: {
   task: PrepTask;
   myName: string;
@@ -328,6 +333,7 @@ function TaskCard({
   onDelete: () => void;
   onRaiseHand: () => void;
   onLowerHand: () => void;
+  onSetWhen: (when: string) => void;
 }) {
   const urgency = taskUrgency(task);
   const due = dueLabel(task.dueDate);
@@ -387,12 +393,41 @@ function TaskCard({
             <p className="text-[13px] text-stone-500 mt-1.5 whitespace-pre-line leading-relaxed">{task.memo}</p>
           )}
 
-          {/* 担当 */}
+          {/* 担当 + いつやる */}
           {!task.done && (
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               {task.assignee ? (
                 <>
                   <span className="text-[12px] font-bold text-stone-600">✋ {task.assignee}</span>
+                  {/* いつやる: 自分の担当なら日付を編集、他の人ならバッジ表示 */}
+                  {isMine ? (
+                    <label
+                      className="relative text-[12px] font-bold rounded-full px-2.5 py-1 active:scale-95 cursor-pointer flex items-center gap-1"
+                      style={
+                        task.assigneeWhen
+                          ? { background: 'rgba(216,107,74,0.1)', color: ACCENT }
+                          : { background: '#F5F5F4', color: '#78716C' }
+                      }
+                    >
+                      📅 {task.assigneeWhen ? planLabel(task.assigneeWhen) : 'いつやる?'}
+                      <input
+                        type="date"
+                        value={task.assigneeWhen ?? ''}
+                        onChange={(e) => onSetWhen(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        aria-label="いつやるか"
+                      />
+                    </label>
+                  ) : (
+                    task.assigneeWhen && (
+                      <span
+                        className="text-[12px] font-bold rounded-full px-2.5 py-1"
+                        style={{ background: 'rgba(216,107,74,0.1)', color: ACCENT }}
+                      >
+                        📅 {planLabel(task.assigneeWhen)}
+                      </span>
+                    )
+                  )}
                   {isMine && (
                     <button
                       onClick={onLowerHand}
