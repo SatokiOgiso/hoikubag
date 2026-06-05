@@ -61,6 +61,7 @@ export function migrate(raw: unknown): AppState | null {
     closedWeekdays: Array.isArray(data.closedWeekdays) ? data.closedWeekdays : [0, 6],
     ...(typeof data.rolloverMinutes === 'number' ? { rolloverMinutes: data.rolloverMinutes } : {}),
     ...(Array.isArray(data.tasks) ? { tasks: data.tasks } : {}),
+    ...(Array.isArray(data.docs) ? { docs: data.docs } : {}),
     updatedAt: data.updatedAt || 0,
   };
 }

@@ -86,6 +86,30 @@ export interface PrepTask {
   updatedAt: number;
 }
 
+/** 書類の分類 */
+export type DocCategory = 'request' | 'event' | 'other'; // 依頼書類 / イベント案内 / その他
+
+/** 書類に添付された写真1枚 */
+export interface DocImage {
+  url: string; // Vercel Blob の公開URL
+  pathname: string; // Blob 上のパス(削除に使う)
+  width?: number;
+  height?: number;
+}
+
+/** 保育園からの書類1件(写真+メタ情報) */
+export interface DocEntry {
+  id: string;
+  title: string; // 自由記述のタイトル
+  category: DocCategory;
+  memo?: string; // 詳細メモ
+  date?: string; // 提出期限・イベント日(YYYY-MM-DD)
+  images: DocImage[]; // 写真(複数可)
+  confirmedBy?: string[]; // 確認した人の名前
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface AppState {
   children: Child[];
   currentChildId: ChildId;
@@ -95,6 +119,7 @@ export interface AppState {
   closedWeekdays: number[]; // 保育園のない曜日 0=日..6=土, デフォルト [0,6]
   rolloverMinutes?: number; // 表示の切り替え時刻(0時からの分)。既定 450(=7:30)
   tasks?: PrepTask[]; // 準備リスト(買い物・提出物・やること)。既存ユーザー向けに optional
+  docs?: DocEntry[]; // 書類リスト(写真付き)。既存ユーザー向けに optional
   updatedAt: number; // 競合解決用タイムスタンプ
 }
 

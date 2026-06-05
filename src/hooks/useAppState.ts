@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppState, Child, Item, RecurringItem, PrepTask } from '../types';
+import type { AppState, Child, Item, RecurringItem, PrepTask, DocEntry } from '../types';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS } from '../constants';
 import { matchesRecurring, appliesDefaults } from '../lib/recurring';
 import {
@@ -839,6 +839,90 @@ export function useAppState() {
     [save]
   );
 
+  // ---- 書類リスト(写真付き)----
+
+  const addDoc = useCallback(
+    (input: Omit<DocEntry, 'id' | 'createdAt' | 'updatedAt'>): boolean => {
+      if (!input.title.trim()) {
+        showToast('タイトルを入力してください');
+        return false;
+      }
+      setState((s) => {
+        if (!s) return s;
+        const now = Date.now();
+        const doc: DocEntry = {
+          ...input,
+          title: input.title.trim(),
+          id: uid(),
+          createdAt: now,
+          updatedAt: now,
+        };
+        const next: AppState = { ...s, docs: [...(s.docs ?? []), doc] };
+        save(next);
+        return next;
+      });
+      showToast('書類を保存しました');
+      return true;
+    },
+    [save, showToast]
+  );
+
+  const updateDoc = useCallback(
+    (doc: DocEntry) => {
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          docs: (s.docs ?? []).map((d) =>
+            d.id === doc.id ? { ...doc, title: doc.title.trim(), updatedAt: Date.now() } : d
+          ),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
+  const removeDoc = useCallback(
+    (id: string) => {
+      const prev = stateRef.current;
+      if (!prev) return;
+      const removed = (prev.docs ?? []).find((d) => d.id === id);
+      const next: AppState = { ...prev, docs: (prev.docs ?? []).filter((d) => d.id !== id) };
+      save(next);
+      showToast(`「${removed?.title ?? ''}」を削除しました`, makeUndo(prev));
+    },
+    [save, showToast, makeUndo]
+  );
+
+  /** 自分(name)の確認状態をトグル。name 空なら何もしない */
+  const toggleDocConfirmed = useCallback(
+    (id: string, name: string) => {
+      const me = name.trim();
+      if (!me) return;
+      setState((s) => {
+        if (!s) return s;
+        const next: AppState = {
+          ...s,
+          docs: (s.docs ?? []).map((d) => {
+            if (d.id !== id) return d;
+            const list = d.confirmedBy ?? [];
+            const has = list.includes(me);
+            return {
+              ...d,
+              confirmedBy: has ? list.filter((n) => n !== me) : [...list, me],
+              updatedAt: Date.now(),
+            };
+          }),
+        };
+        save(next);
+        return next;
+      });
+    },
+    [save]
+  );
+
   // ---- 家族共有 ----
 
   /** 共有を開始: 新しい familyId を発行し、現在のデータをクラウドへアップロード */
@@ -991,6 +1075,10 @@ export function useAppState() {
       toggleTaskDone,
       setTaskAssignee,
       setTaskWhen,
+      addDoc,
+      updateDoc,
+      removeDoc,
+      toggleDocConfirmed,
       enableSharing,
       joinFamily,
       disableSharing,
