@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Settings, BarChart3, ClipboardList } from 'lucide-react';
+import { Settings, BarChart3, ClipboardList, Images } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
-import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY } from './constants';
+import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY, ACCENT } from './constants';
 import { useAppState } from './hooks/useAppState';
 import DateStrip from './components/DateStrip';
 import BagSummary from './components/BagSummary';
@@ -11,8 +11,10 @@ import AnalyticsModal from './components/AnalyticsModal';
 import AnalyticsIntro from './components/AnalyticsIntro';
 import PrepListModal from './components/PrepListModal';
 import PrepListIntro from './components/PrepListIntro';
+import DocsModal from './components/DocsModal';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
 import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
+import { unconfirmedDocCount } from './lib/docs';
 import { syncSubscriptionFamily } from './lib/push';
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
@@ -43,6 +45,7 @@ export default function App() {
   const [showAnalyticsIntro, setShowAnalyticsIntro] = useState(false);
   const [showPrepList, setShowPrepList] = useState(false);
   const [showPrepListIntro, setShowPrepListIntro] = useState(false);
+  const [showDocs, setShowDocs] = useState(false);
   const [myName, setMyNameState] = useState<string>(() => localStorage.getItem(MY_NAME_KEY) ?? '');
   const setMyName = (v: string) => {
     setMyNameState(v);
@@ -171,6 +174,10 @@ export default function App() {
   const taskByKind = incompleteCountsByKind(tasks);
   const urgentCount = urgentTaskCount(tasks);
 
+  // 書類: 自分が未確認の件数(バッジ用)
+  const docs = state.docs ?? [];
+  const unconfirmedDocs = unconfirmedDocCount(docs, myName);
+
   return (
     <div className="min-h-screen pb-16">
       {/* 背景の薄いドットパターン */}
@@ -214,7 +221,7 @@ export default function App() {
                 hoikubag
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {/* 準備リスト — 常に「やること」ラベル + 種別件数 + 期限注意件数 */}
               <button
                 onClick={() => setShowPrepList(true)}
@@ -248,6 +255,22 @@ export default function App() {
                       </div>
                     )}
                   </>
+                )}
+              </button>
+              {/* 書類 — 写真付きの書類リスト。自分が未確認の件数バッジ付き */}
+              <button
+                onClick={() => setShowDocs(true)}
+                className="relative w-14 h-14 rounded-2xl bg-white border border-stone-200 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="書類"
+              >
+                <Images size={22} className="text-stone-600" />
+                {unconfirmedDocs > 0 && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full text-white text-[11px] font-black flex items-center justify-center ring-2 ring-white"
+                    style={{ background: ACCENT }}
+                  >
+                    {unconfirmedDocs}
+                  </span>
                 )}
               </button>
               <button
@@ -352,6 +375,17 @@ export default function App() {
 
       {showPrepListIntro && (
         <PrepListIntro onOpen={openPrepListFromIntro} onClose={dismissPrepListIntro} />
+      )}
+
+      {showDocs && (
+        <DocsModal
+          state={state}
+          myName={myName}
+          onSetMyName={setMyName}
+          showToast={showToast}
+          onClose={() => setShowDocs(false)}
+          actions={actions}
+        />
       )}
 
       {showOnboarding && (
