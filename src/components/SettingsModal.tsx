@@ -40,6 +40,7 @@ interface Props {
     enableSharing: () => void;
     joinFamily: (input: string) => Promise<boolean>;
     disableSharing: () => void;
+    deleteSharedData: () => void;
     syncNow: () => void;
   };
 }
@@ -1048,6 +1049,25 @@ export default function SettingsModal({
                 <p className="text-[10px] text-stone-400 leading-relaxed px-1">
                   タブ復帰時に自動で最新を取り込みます。同時編集時は後から保存した内容が優先されます。
                 </p>
+
+                {/* クラウドからの完全削除(家族全員に影響) */}
+                <button
+                  onClick={() =>
+                    askConfirm(
+                      {
+                        title: '共有データをクラウドから削除しますか?',
+                        message:
+                          'クラウド上の共有データを完全に削除します。家族全員の同期が解除され、元に戻せません。\nこの端末の手元のデータは残ります。',
+                        confirmLabel: '削除する',
+                        destructive: true,
+                      },
+                      actions.deleteSharedData
+                    )
+                  }
+                  className="w-full bg-white rounded-xl py-2.5 border border-stone-200 text-stone-400 font-bold text-xs hover:text-red-600 hover:bg-red-50 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={13} /> 共有データをクラウドから削除
+                </button>
               </div>
             )}
           </section>

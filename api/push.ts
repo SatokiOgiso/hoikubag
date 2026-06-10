@@ -48,6 +48,37 @@ export async function redis(command: unknown[]): Promise<unknown> {
   return data.result ?? null;
 }
 
+function clientIp(req: VercelRequest): string {
+  const xff = req.headers['x-forwarded-for'];
+  const raw = Array.isArray(xff) ? xff[0] : xff;
+  return (raw?.split(',')[0]?.trim() || (req.headers['x-real-ip'] as string) || 'unknown').slice(0, 64);
+}
+
+/** 簡易レート制限(固定窓)。Redis 障害時はフェイルオープン(通す)。 */
+async function rateLimited(bucket: string, limit: number, windowSec: number): Promise<boolean> {
+  try {
+    const n = Number(await redis(['INCR', bucket]));
+    if (n === 1) await redis(['EXPIRE', bucket, windowSec]);
+    return n > limit;
+  } catch {
+    return false;
+  }
+}
+
+function isValidFamilyId(f: unknown): f is string {
+  return typeof f === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(f);
+}
+
+/** Push サービスの endpoint が https の URL か(任意URLの登録による悪用を防ぐ) */
+function isHttpsUrl(s: unknown): s is string {
+  if (typeof s !== 'string' || s.length > 2048) return false;
+  try {
+    return new URL(s).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const rawAction = req.query.action;
   const action = Array.isArray(rawAction) ? rawAction[0] : rawAction;
@@ -59,13 +90,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      // IP 単位のレート制限(購読の大量登録・通知スパムの抑止)
+      if (await rateLimited(`rl:push:${clientIp(req)}`, 60, 60)) {
+        return res.status(429).json({ error: 'too many requests' });
+      }
+
       const body =
         typeof req.body === 'string' ? JSON.parse(req.body) : (req.body as Record<string, unknown>);
 
       if (action === 'subscribe') {
         const subscription = body?.subscription as { endpoint?: string } | undefined;
-        const familyId = (body?.familyId as string | null) ?? null;
-        if (!subscription?.endpoint) {
+        const rawFamilyId = (body?.familyId as string | null) ?? null;
+        const familyId = isValidFamilyId(rawFamilyId) ? rawFamilyId : null;
+        // endpoint は実在の Push サービス(https)に限る
+        if (!subscription || !isHttpsUrl(subscription.endpoint)) {
           return res.status(400).json({ error: 'invalid subscription' });
         }
         await redis([
@@ -79,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (action === 'unsubscribe') {
         const endpoint = body?.endpoint as string | undefined;
-        if (!endpoint) return res.status(400).json({ error: 'invalid endpoint' });
+        if (!isHttpsUrl(endpoint)) return res.status(400).json({ error: 'invalid endpoint' });
         await redis(['HDEL', SUBS_KEY, endpoint]);
         return res.status(200).json({ ok: true });
       }
@@ -89,7 +127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (action === 'notify') {
         const familyId = body?.familyId as string | undefined;
         const excludeEndpoint = (body?.excludeEndpoint as string | null) ?? null;
-        if (!familyId) return res.status(400).json({ error: 'familyId required' });
+        if (!isValidFamilyId(familyId)) return res.status(400).json({ error: 'familyId required' });
+        // 家族単位でも通知の連投を抑える(スパム防止)
+        if (await rateLimited(`rl:notify:${familyId}`, 5, 60)) {
+          return res.status(429).json({ error: 'too many requests' });
+        }
         if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
           return res.status(500).json({ error: 'VAPID 未設定' });
         }
@@ -139,8 +181,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'method not allowed' });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'server error';
-    console.error('[api/push] error', { action, message, error: e });
-    return res.status(500).json({ error: message });
+    // 詳細はログにのみ残し、応答は一般化する
+    console.error('[api/push] error', { action, error: e });
+    return res.status(500).json({ error: 'server error' });
   }
 }

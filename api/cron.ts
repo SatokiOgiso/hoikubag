@@ -65,12 +65,14 @@ async function familyAllConfirmed(familyId: string): Promise<boolean> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Cron 認証(手動叩き防止)
-  if (CRON_SECRET) {
-    const auth = req.headers.authorization;
-    if (auth !== `Bearer ${CRON_SECRET}`) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
+  // Cron 認証(手動叩き防止)。CRON_SECRET 未設定なら誰でも叩ける状態になるため拒否する。
+  if (!CRON_SECRET) {
+    console.error('[api/cron] CRON_SECRET 未設定のため実行を拒否しました');
+    return res.status(500).json({ error: 'server misconfigured' });
+  }
+  const auth = req.headers.authorization;
+  if (auth !== `Bearer ${CRON_SECRET}`) {
+    return res.status(401).json({ error: 'unauthorized' });
   }
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
     return res.status(500).json({ error: 'VAPID 未設定' });
