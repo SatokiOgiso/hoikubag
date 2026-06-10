@@ -134,21 +134,39 @@ export class KvStorageProvider implements StorageProvider {
 
 // ---- familyId 管理 ----
 
-/** URL の ?f= を最優先(あれば永続化)、なければ localStorage の保存値 */
+/** familyId の形式チェック(サーバー側の検証と一致させる) */
+export function isValidFamilyId(f: unknown): f is string {
+  return typeof f === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(f);
+}
+
+/** この端末に保存済みの familyId(URL は参照しない。参加は明示的に行う) */
 export function getStoredFamilyId(): string | null {
-  try {
-    const fromUrl = new URL(window.location.href).searchParams.get('f');
-    if (fromUrl) {
-      localStorage.setItem(FAMILY_ID_KEY, fromUrl);
-      return fromUrl;
-    }
-  } catch {
-    /* noop */
-  }
   try {
     return localStorage.getItem(FAMILY_ID_KEY);
   } catch {
     return null;
+  }
+}
+
+/** 招待リンク(?f=)に含まれる familyId。なければ null */
+export function getFamilyIdFromUrl(): string | null {
+  try {
+    const fromUrl = new URL(window.location.href).searchParams.get('f');
+    return isValidFamilyId(fromUrl) ? fromUrl : null;
+  } catch {
+    return null;
+  }
+}
+
+/** URL から ?f= を取り除く(履歴・共有先プレビューに familyId を残さない) */
+export function clearFamilyIdFromUrl(): void {
+  try {
+    const u = new URL(window.location.href);
+    if (!u.searchParams.has('f')) return;
+    u.searchParams.delete('f');
+    window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch {
+    /* noop */
   }
 }
 
@@ -168,13 +186,29 @@ export function clearStoredFamilyId(): void {
   }
 }
 
-/** 推測されにくい家族ID を生成 */
+/** 推測されにくい家族ID を生成(暗号学的乱数を使う) */
 export function generateFamilyId(): string {
   const c = globalThis.crypto;
   if (c?.randomUUID) return c.randomUUID().replace(/-/g, '');
+  if (c?.getRandomValues) {
+    const b = new Uint8Array(16);
+    c.getRandomValues(b);
+    return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  }
+  // 最終手段(現代のブラウザでは到達しない)
   return (
-    Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10)
+    Math.random().toString(36).slice(2) +
+    Math.random().toString(36).slice(2) +
+    Date.now().toString(36)
   );
+}
+
+/** クラウド上の家族データを削除する(共有メンバー全員に影響する操作) */
+export async function deleteCloudData(familyId: string): Promise<void> {
+  const r = await fetch(`/api/state?f=${encodeURIComponent(familyId)}`, { method: 'DELETE' });
+  if (!r.ok) {
+    throw new Error(`サーバー応答エラー (HTTP ${r.status})`);
+  }
 }
 
 /** 共有リンク(現在のURLに ?f= を付与) */

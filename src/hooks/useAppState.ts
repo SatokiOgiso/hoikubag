@@ -5,10 +5,14 @@ import { matchesRecurring, appliesDefaults } from '../lib/recurring';
 import {
   createProvider,
   getStoredFamilyId,
+  getFamilyIdFromUrl,
+  clearFamilyIdFromUrl,
   setStoredFamilyId,
   clearStoredFamilyId,
   generateFamilyId,
+  isValidFamilyId,
   loadLocalCache,
+  deleteCloudData,
   KvStorageProvider,
   type StorageProvider,
 } from '../lib/storage';
@@ -45,6 +49,8 @@ export function useAppState() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [familyId, setFamilyId] = useState<string | null>(null);
+  // 招待リンク(?f=)で別の共有への参加を提示されているとき、その familyId(未確認)
+  const [pendingJoin, setPendingJoin] = useState<string | null>(null);
   // 選択中の日付(YYYY-MM-DD)。既定は明日。揮発(同期しない)
   const [selectedDate, setSelectedDate] = useState<string>(() => jstDateOffset(1));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
@@ -78,6 +84,14 @@ export function useAppState() {
     let active = true;
     (async () => {
       const fid = getStoredFamilyId();
+      // 招待リンク(?f=)で別の familyId を提示されている場合は、自動参加せず確認を促す。
+      const urlFid = getFamilyIdFromUrl();
+      if (urlFid && urlFid !== fid) {
+        setPendingJoin(urlFid);
+      } else if (urlFid) {
+        // 自分の共有リンクを開いただけ → URL から familyId を掃除する
+        clearFamilyIdFromUrl();
+      }
       providerRef.current = createProvider(fid);
       let next: AppState;
       try {
@@ -864,7 +878,7 @@ export function useAppState() {
     } catch {
       // URLでなければそのまま familyId として扱う
     }
-    if (!/^[A-Za-z0-9_-]{6,64}$/.test(fid)) {
+    if (!isValidFamilyId(fid)) {
       showToast('招待コードが正しくありません');
       return false;
     }
@@ -890,6 +904,20 @@ export function useAppState() {
     }
   }, [showToast]);
 
+  /** 招待リンクでの参加を承認する(明示的な確認後に実行) */
+  const confirmPendingJoin = useCallback(async () => {
+    const fid = pendingJoin;
+    setPendingJoin(null);
+    clearFamilyIdFromUrl();
+    if (fid) await joinFamily(fid);
+  }, [pendingJoin, joinFamily]);
+
+  /** 招待リンクでの参加を見送る(この端末のデータのまま続行) */
+  const dismissPendingJoin = useCallback(() => {
+    setPendingJoin(null);
+    clearFamilyIdFromUrl();
+  }, []);
+
   /** 共有を停止: この端末を共有から外す(クラウドのデータは保持) */
   const disableSharing = useCallback(() => {
     clearStoredFamilyId();
@@ -898,6 +926,28 @@ export function useAppState() {
     setSyncStatus('local');
     setSyncError(null);
     showToast('この端末の共有を停止しました');
+  }, [showToast]);
+
+  /** 共有データをクラウドから削除する(家族全員に影響)。この端末はローカル保存へ戻す */
+  const deleteSharedData = useCallback(async () => {
+    const fid = getStoredFamilyId();
+    if (!fid) {
+      showToast('共有していません');
+      return;
+    }
+    try {
+      await deleteCloudData(fid);
+    } catch (e) {
+      markSyncError(e);
+      showToast('クラウドデータの削除に失敗しました');
+      return;
+    }
+    clearStoredFamilyId();
+    providerRef.current = createProvider(null);
+    setFamilyId(null);
+    setSyncStatus('local');
+    setSyncError(null);
+    showToast('共有データをクラウドから削除しました');
   }, [showToast]);
 
   /** 今すぐクラウドの最新を取得 */
@@ -952,6 +1002,7 @@ export function useAppState() {
     toast,
     showToast,
     familyId,
+    pendingJoin,
     syncStatus,
     syncError,
     forecast,
@@ -993,7 +1044,10 @@ export function useAppState() {
       setTaskWhen,
       enableSharing,
       joinFamily,
+      confirmPendingJoin,
+      dismissPendingJoin,
       disableSharing,
+      deleteSharedData,
       syncNow,
       applyOnboarding,
     },

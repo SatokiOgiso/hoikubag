@@ -83,6 +83,22 @@ Vercel の **Marketplace → Upstash** 連携を追加すると、以下が自�
 > 「家族とのデータ同期」に **⚠️ クラウドに接続できていません** と表示される。
 > Upstash を連携し、変数設定後に **再デプロイ**すると解消する。
 
+### 通知(リマインド)を使う場合の環境変数
+
+毎晩の準備リマインドと「確定のお願い」通知(Web Push)を使う場合は、以下も設定する。
+
+| 変数 | 説明 |
+|------|------|
+| `VAPID_PUBLIC_KEY` / `VITE_VAPID_PUBLIC_KEY` | VAPID 公開鍵(サーバー用 / クライアント用。同じ値) |
+| `VAPID_PRIVATE_KEY` | VAPID 秘密鍵 |
+| `VAPID_SUBJECT` | `mailto:` から始まる連絡先(任意) |
+| `CRON_SECRET` | **必須**。Cron(`/api/cron`)の認証に使う任意の長い文字列 |
+
+> **重要:** `CRON_SECRET` を設定しないと `/api/cron` は実行を拒否する(誰でも叩ける
+> 状態を防ぐため)。リマインド通知を有効にするには、Vercel の環境変数に
+> `CRON_SECRET` を設定して再デプロイすること。Vercel Cron は自動でこの値を
+> `Authorization: Bearer <CRON_SECRET>` として付与する。
+
 ### Upstash セットアップ手順(無料)
 
 1. Vercel のプロジェクト → **Storage**(または Integrations / Marketplace)→ **Upstash for Redis** を追加。

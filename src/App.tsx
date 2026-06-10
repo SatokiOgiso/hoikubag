@@ -12,6 +12,7 @@ import AnalyticsIntro from './components/AnalyticsIntro';
 import PrepListModal from './components/PrepListModal';
 import PrepListIntro from './components/PrepListIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
+import ConfirmDialog from './components/ConfirmDialog';
 import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
 
@@ -29,6 +30,7 @@ export default function App() {
     loading,
     toast,
     familyId,
+    pendingJoin,
     syncStatus,
     syncError,
     forecast,
@@ -360,6 +362,20 @@ export default function App() {
           isFirstRun={onboardingFirstRun}
           onComplete={finishOnboarding}
           onClose={closeOnboarding}
+        />
+      )}
+
+      {/* 招待リンクからの参加確認(自動参加はせず、明示的な同意を求める) */}
+      {pendingJoin && (
+        <ConfirmDialog
+          title="家族の共有データに参加しますか?"
+          message={
+            '招待リンクが開かれました。参加すると、この端末の表示が家族の共有データに切り替わります。\n' +
+            'この端末に今あるデータは共有データに置き換わります(共有を使わない場合は「参加しない」を選んでください)。'
+          }
+          confirmLabel="参加する"
+          onConfirm={actions.confirmPendingJoin}
+          onCancel={actions.dismissPendingJoin}
         />
       )}
 
