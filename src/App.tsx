@@ -12,6 +12,7 @@ import AnalyticsIntro from './components/AnalyticsIntro';
 import PrepListModal from './components/PrepListModal';
 import PrepListIntro from './components/PrepListIntro';
 import Onboarding, { type OnboardingData } from './components/Onboarding';
+import SimpleView from './components/SimpleView';
 import ConfirmDialog from './components/ConfirmDialog';
 import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
@@ -23,6 +24,8 @@ const FEATURE_ANALYTICS_KEY = 'hoiku-feature-analytics-v1';
 const FEATURE_PREPLIST_KEY = 'hoiku-feature-preplist-v1';
 // 端末ごとの自分の名前(担当の手挙げ用。同期しない)
 const MY_NAME_KEY = 'hoiku-my-name';
+// 端末ごとの表示モード(閲覧専用かどうか)。最後に選んだモードがその端末の既定になる
+const VIEW_MODE_KEY = 'hoiku-view-mode';
 
 export default function App() {
   const {
@@ -49,6 +52,14 @@ export default function App() {
   const setMyName = (v: string) => {
     setMyNameState(v);
     localStorage.setItem(MY_NAME_KEY, v);
+  };
+  // 閲覧専用(かんたん表示)。切り替えは端末に保存され、次回からその表示で起動する
+  const [simpleView, setSimpleViewState] = useState<boolean>(
+    () => localStorage.getItem(VIEW_MODE_KEY) === 'simple'
+  );
+  const setSimpleView = (v: boolean) => {
+    setSimpleViewState(v);
+    localStorage.setItem(VIEW_MODE_KEY, v ? 'simple' : 'full');
   };
   // オンボーディング: 初回起動 or 設定からの再表示
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -173,16 +184,64 @@ export default function App() {
   const taskByKind = incompleteCountsByKind(tasks);
   const urgentCount = urgentTaskCount(tasks);
 
+  // 両表示モードで共通の要素
+  const backgroundDots = (
+    <div
+      className="fixed inset-0 pointer-events-none opacity-[0.035]"
+      style={{
+        backgroundImage: 'radial-gradient(circle, #3D2818 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}
+    />
+  );
+  const joinDialog = pendingJoin && (
+    <ConfirmDialog
+      title="家族の共有データに参加しますか?"
+      message={
+        '招待リンクが開かれました。参加すると、この端末の表示が家族の共有データに切り替わります。\n' +
+        'この端末に今あるデータは共有データに置き換わります(共有を使わない場合は「参加しない」を選んでください)。'
+      }
+      confirmLabel="参加する"
+      onConfirm={actions.confirmPendingJoin}
+      onCancel={actions.dismissPendingJoin}
+    />
+  );
+  const toastEl = toast && (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white pl-5 pr-2 py-2 rounded-2xl shadow-lg z-50 font-bold text-sm flex items-center gap-3 max-w-[calc(100vw-2rem)]">
+      <span className="py-1">{toast.message}</span>
+      {toast.undo && (
+        <button
+          onClick={toast.undo}
+          className="shrink-0 px-3 py-1.5 rounded-xl bg-white/15 text-white font-bold active:scale-95 transition-all"
+        >
+          元に戻す
+        </button>
+      )}
+    </div>
+  );
+
+  // 閲覧専用(かんたん表示): かばんの中身だけを大きく表示する
+  if (simpleView) {
+    return (
+      <div className="min-h-screen pb-10">
+        {backgroundDots}
+        <SimpleView
+          state={state}
+          items={allItems}
+          date={selectedDate}
+          onChangeDate={setSelectedDate}
+          onExit={() => setSimpleView(false)}
+        />
+        {joinDialog}
+        {toastEl}
+        <Analytics />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-16">
-      {/* 背景の薄いドットパターン */}
-      <div
-        className="fixed inset-0 pointer-events-none opacity-[0.035]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #3D2818 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
-        }}
-      />
+      {backgroundDots}
 
       <div className="relative max-w-lg mx-auto">
         {/* デプロイ識別用バージョン(最上部に小さく) */}
@@ -324,6 +383,10 @@ export default function App() {
           onFontScale={setFontScale}
           showToast={showToast}
           onShowOnboarding={reopenOnboarding}
+          onEnterSimpleView={() => {
+            setShowSettings(false);
+            setSimpleView(true);
+          }}
           onClose={() => setShowSettings(false)}
           actions={actions}
         />
@@ -366,33 +429,10 @@ export default function App() {
       )}
 
       {/* 招待リンクからの参加確認(自動参加はせず、明示的な同意を求める) */}
-      {pendingJoin && (
-        <ConfirmDialog
-          title="家族の共有データに参加しますか?"
-          message={
-            '招待リンクが開かれました。参加すると、この端末の表示が家族の共有データに切り替わります。\n' +
-            'この端末に今あるデータは共有データに置き換わります(共有を使わない場合は「参加しない」を選んでください)。'
-          }
-          confirmLabel="参加する"
-          onConfirm={actions.confirmPendingJoin}
-          onCancel={actions.dismissPendingJoin}
-        />
-      )}
+      {joinDialog}
 
       {/* トースト */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-stone-800 text-white pl-5 pr-2 py-2 rounded-2xl shadow-lg z-50 font-bold text-sm flex items-center gap-3 max-w-[calc(100vw-2rem)]">
-          <span className="py-1">{toast.message}</span>
-          {toast.undo && (
-            <button
-              onClick={toast.undo}
-              className="shrink-0 px-3 py-1.5 rounded-xl bg-white/15 text-white font-bold active:scale-95 transition-all"
-            >
-              元に戻す
-            </button>
-          )}
-        </div>
-      )}
+      {toastEl}
       <Analytics />
     </div>
   );

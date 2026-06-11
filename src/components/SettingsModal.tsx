@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle } from 'lucide-react';
+import { X, Plus, Minus, Trash2, RefreshCw, Copy, Check, Users, AlertTriangle, Eye } from 'lucide-react';
 import type { AppState, Item, RecurringItem, RecurrenceType } from '../types';
 import type { SyncStatus } from '../hooks/useAppState';
 import { COMMON_LOCATIONS, ACCENT, DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEM_EMOJI_CHOICES } from '../constants';
@@ -20,6 +20,8 @@ interface Props {
   onFontScale: (v: number) => void;
   showToast: (msg: string) => void;
   onShowOnboarding: () => void;
+  /** 閲覧専用(かんたん表示)へ切り替える */
+  onEnterSimpleView: () => void;
   onClose: () => void;
   actions: {
     addChild: () => void;
@@ -57,6 +59,7 @@ export default function SettingsModal({
   onFontScale,
   showToast,
   onShowOnboarding,
+  onEnterSimpleView,
   onClose,
   actions,
 }: Props) {
@@ -849,6 +852,21 @@ export default function SettingsModal({
                 までは当日を表示し、以降は次の登園日を表示します
               </div>
             </div>
+          </section>
+
+          {/* 閲覧専用モード */}
+          <section>
+            <h3 className="text-sm font-bold text-stone-700 mb-1">閲覧モード(かんたん表示)</h3>
+            <div className="text-xs text-stone-500 mb-2 leading-relaxed">
+              用意するかばんの中身だけを大きく表示する、見るだけのモードです。
+              一度切り替えるとこの端末では次回からこの表示で起動します(いつでも戻せます)。
+            </div>
+            <button
+              onClick={onEnterSimpleView}
+              className="w-full rounded-xl py-3 bg-white border border-stone-200 text-stone-700 font-bold active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <Eye size={16} /> 閲覧モードに切り替え
+            </button>
           </section>
 
           {/* 文字サイズ */}
