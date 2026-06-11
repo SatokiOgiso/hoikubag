@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, BarChart3, ClipboardList } from 'lucide-react';
+import { Settings, BarChart3, ClipboardList, Eye } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { DEFAULT_THRESHOLD, DEFAULT_CLOSED_WEEKDAYS, DEFAULT_ROLLOVER, ITEMS, STORAGE_KEY } from './constants';
 import { useAppState } from './hooks/useAppState';
@@ -275,7 +275,16 @@ export default function App() {
                 hoikubag
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {/* 閲覧モード(かんたん表示)へ切り替え */}
+              <button
+                onClick={() => setSimpleView(true)}
+                className="min-h-[56px] rounded-2xl bg-white border border-stone-200 active:scale-95 transition-all flex flex-col items-center justify-center px-3 py-2 gap-0.5"
+                aria-label="かんたん表示(閲覧モード)に切り替え"
+              >
+                <Eye size={18} className="text-stone-400" />
+                <span className="text-[10px] font-bold text-stone-400 leading-none">かんたん</span>
+              </button>
               {/* 準備リスト — 常に「やること」ラベル + 種別件数 + 期限注意件数 */}
               <button
                 onClick={() => setShowPrepList(true)}
