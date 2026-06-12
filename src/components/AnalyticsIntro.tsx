@@ -42,7 +42,7 @@ export default function AnalyticsIntro({ onOpen, onClose }: Props) {
             見られるようになりました
           </h1>
           <p className="text-sm text-stone-600 leading-relaxed font-medium mb-5">
-            毎日の「確定」がそのまま記録に。
+            毎日の「用意できた!」がそのまま記録に。
             <br />
             これまでの準備をふりかえって、達成感を味わえます。
           </p>

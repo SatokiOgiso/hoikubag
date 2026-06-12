@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, Lock, X, Users, MessageSquare } from 'lucide-react';
+import { Plus, Minus, RefreshCw, AlertTriangle, Check, Copy, X, Users, MessageSquare } from 'lucide-react';
 import type { Child, Item } from '../types';
 import { ACCENT } from '../constants';
 import { jstDateOffset, jstWeekday, jstWeekdayNum } from '../lib/date';
@@ -136,21 +136,21 @@ export default function ItemList({
         <h2 className="text-sm font-bold text-stone-700">
           持ち物 <span className="text-stone-400">· {child.name}</span>
         </h2>
-        {confirmed ? (
-          <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
-            <Lock size={11} />
-            確定済み・編集不可
-          </div>
-        ) : (
-          totalCount > 0 && (
+        <div className="flex items-center gap-2">
+          {confirmed && (
+            <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold">
+              <Check size={12} strokeWidth={3} /> 用意ずみ
+            </div>
+          )}
+          {totalCount > 0 && (
             <button
               onClick={() => setConfirmResetChild(true)}
               className="text-xs text-stone-500 flex items-center gap-1 px-2 py-1 rounded-lg hover:text-red-600 active:scale-95 transition-all"
             >
               <RefreshCw size={14} /> リセット
             </button>
-          )
-        )}
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -222,24 +222,22 @@ export default function ItemList({
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  {!confirmed && (
-                    <button
-                      onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
-                      className={`w-11 h-11 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
-                        localItemNotes[item.key]?.trim()
-                          ? 'bg-stone-200 text-stone-600'
-                          : 'bg-stone-100 text-stone-400'
-                      }`}
-                      aria-label="この品目にメモ"
-                    >
-                      <MessageSquare size={18} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setOpenItemNote((k) => (k === item.key ? null : item.key))}
+                    className={`w-11 h-11 mr-3 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
+                      localItemNotes[item.key]?.trim()
+                        ? 'bg-stone-200 text-stone-600'
+                        : 'bg-stone-100 text-stone-400'
+                    }`}
+                    aria-label="この品目にメモ"
+                  >
+                    <MessageSquare size={18} />
+                  </button>
                   <button
                     onClick={() => bumpItem(item.key, -1, count)}
-                    disabled={confirmed || count === 0}
+                    disabled={count === 0}
                     className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all active:scale-90 ${
-                      confirmed || count === 0
+                      count === 0
                         ? 'bg-stone-100 text-stone-300'
                         : 'bg-stone-100 text-stone-700'
                     }`}
@@ -251,16 +249,13 @@ export default function ItemList({
                     aria-live="polite"
                     className={`w-12 text-center font-black text-2xl transition-transform duration-150 ${
                       pulseKey === item.key ? 'scale-125' : 'scale-100'
-                    } ${
-                      confirmed ? 'text-stone-300' : count > 0 ? 'text-stone-800' : 'text-stone-300'
-                    }`}
+                    } ${count > 0 ? 'text-stone-800' : 'text-stone-300'}`}
                   >
                     {count}
                   </div>
                   <button
                     onClick={() => bumpItem(item.key, 1, count)}
-                    disabled={confirmed}
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all disabled:opacity-30"
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-90 transition-all"
                     style={{ background: ACCENT }}
                     aria-label="増やす"
                   >
@@ -268,8 +263,8 @@ export default function ItemList({
                   </button>
                 </div>
               </div>
-              {/* 品目メモ入力欄(開いている時・未確定) */}
-              {!confirmed && openItemNote === item.key && (
+              {/* 品目メモ入力欄(開いている時) */}
+              {openItemNote === item.key && (
                 <div className="px-3 pb-2.5 -mt-1">
                   <input
                     type="text"
@@ -314,67 +309,54 @@ export default function ItemList({
                 type="text"
                 value={note}
                 onChange={(e) => updateNote(i, e.target.value)}
-                readOnly={confirmed}
                 placeholder="書類名・持ち物など"
                 className={`flex-1 font-bold text-base bg-transparent outline-none min-w-0 ${
-                  confirmed
-                    ? note.trim()
-                      ? 'text-stone-400'
-                      : 'text-stone-300'
-                    : note.trim()
-                    ? 'text-stone-800'
-                    : 'placeholder:text-stone-300 text-stone-800'
+                  note.trim() ? 'text-stone-800' : 'placeholder:text-stone-300 text-stone-800'
                 }`}
               />
-              {!confirmed && (
-                <button
-                  onClick={() => removeNote(i)}
-                  className="w-11 h-11 rounded-xl flex items-center justify-center bg-stone-100 text-stone-400 active:bg-red-100 active:text-red-500 active:scale-90 transition-all shrink-0"
-                  aria-label={note.trim() ? `「${note.trim()}」を削除` : 'メモを削除'}
-                >
-                  <X size={18} />
-                </button>
-              )}
+              <button
+                onClick={() => removeNote(i)}
+                className="w-11 h-11 rounded-xl flex items-center justify-center bg-stone-100 text-stone-400 active:bg-red-100 active:text-red-500 active:scale-90 transition-all shrink-0"
+                aria-label={note.trim() ? `「${note.trim()}」を削除` : 'メモを削除'}
+              >
+                <X size={18} />
+              </button>
             </div>
           </div>
         ))}
 
         {/* メモ追加ボタン */}
-        {!confirmed && (
-          <button
-            onClick={addNote}
-            className="w-full py-3 rounded-2xl border border-dashed border-stone-200 text-stone-400 text-sm font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-          >
-            <Plus size={14} /> その日だけの持ち物を追加
-          </button>
-        )}
+        <button
+          onClick={addNote}
+          className="w-full py-3 rounded-2xl border border-dashed border-stone-200 text-stone-400 text-sm font-medium flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+        >
+          <Plus size={14} /> その日だけの持ち物を追加
+        </button>
       </div>
 
-      {/* その日全体のメモ */}
-      <div className="mt-4">
-        <label htmlFor="day-memo" className="text-xs font-bold text-stone-500 mb-1.5 flex items-center gap-1.5">
-          <MessageSquare size={13} /> この日のメモ
+      {/* 今日のこと(自由メモ・会話のきっかけ。持ち物にひもづかない一言もここへ) */}
+      <div className="mt-5 rounded-2xl bg-amber-50/60 border border-amber-200/70 p-3.5">
+        <label htmlFor="day-memo" className="text-sm font-bold text-amber-900 mb-0.5 flex items-center gap-1.5">
+          <MessageSquare size={15} /> 今日のこと
         </label>
+        <p className="text-[11px] text-amber-700/80 mb-2 leading-relaxed">
+          保育園であったこと・持ち物のこと・家族へのひとこと、なんでも。お迎えや夜の会話のきっかけに。
+        </p>
         <textarea
           id="day-memo"
           value={localDayMemo}
           onChange={(e) => updateDayMemo(e.target.value)}
-          readOnly={confirmed}
           rows={2}
-          placeholder="例: お昼寝布団を持ち帰り、水筒は大きいもの など"
-          className={`w-full text-sm rounded-2xl px-3.5 py-3 border outline-none resize-y transition-all ${
-            confirmed
-              ? 'bg-stone-50 border-stone-200 text-stone-500'
-              : 'bg-white border-stone-200 focus:border-stone-400 text-stone-700'
-          }`}
+          placeholder="例) プールで大はしゃぎだったみたい😊 / 鼻水ぎみ / 明日のお迎えおねがい!"
+          className="w-full text-sm rounded-xl px-3.5 py-3 border border-amber-200 bg-white outline-none resize-y focus:border-amber-400 text-stone-700 placeholder:text-stone-300"
         />
       </div>
 
-      {/* 確定ボタン */}
+      {/* 用意できたマーク(締める/封印ではなく、軽い達成チェック。いつでも戻せる) */}
       <button
         onClick={() => {
           onToggleConfirm(date);
-          showToast(confirmed ? '確定を取り消しました' : `${child.name}の準備を確定しました`);
+          showToast(confirmed ? '「用意ずみ」を戻しました' : `${child.name}の用意できました 🎒`);
         }}
         className={`w-full mt-4 py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 active:scale-95 transition-all ${
           confirmed
@@ -384,7 +366,7 @@ export default function ItemList({
         style={confirmed ? {} : { background: '#10B981' }}
       >
         <Check size={22} strokeWidth={3} />
-        {confirmed ? `${child.name}の確定を取り消す` : `${child.name}の準備を確定する`}
+        {confirmed ? `${child.name}「用意ずみ」(タップで戻す)` : `${child.name}の用意できた!`}
       </button>
 
       {/* 他の日にコピー */}

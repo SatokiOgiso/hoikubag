@@ -133,7 +133,7 @@ export default function Onboarding({ state, isFirstRun, onComplete, onClose }: P
               <OnboardFeature
                 emoji="📊"
                 title="準備の記録・統計"
-                desc="毎日の「確定」が記録として積み重なります。達成バッジや持ち物ランキングも確認できます。"
+                desc="毎日の「用意できた!」が記録として積み重なります。達成バッジや持ち物ランキングも確認できます。"
               />
               <OnboardFeature
                 emoji="👨‍👩‍👧"

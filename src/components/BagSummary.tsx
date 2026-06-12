@@ -28,7 +28,7 @@ export default function BagSummary({
 
   const handleRequestConfirm = async () => {
     if (!familyId) {
-      showToast('家族共有を有効にすると、家族に確定をお願いできます');
+      showToast('家族共有を有効にすると、家族に声をかけられます');
       return;
     }
     setRequesting(true);
@@ -36,11 +36,11 @@ export default function BagSummary({
       const sent = await requestFamilyConfirm(familyId);
       showToast(
         sent > 0
-          ? `家族に確定のお願いを送りました(${sent}件)`
-          : 'お願いの送信先が見つかりませんでした'
+          ? `家族に「今日のこと、聞かせて」を送りました(${sent}件)`
+          : '送り先が見つかりませんでした'
       );
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'お願いの送信に失敗しました');
+      showToast(e instanceof Error ? e.message : '送信に失敗しました');
     } finally {
       // 連打防止に少し待ってから再度押せるようにする
       setTimeout(() => setRequesting(false), 3000);
@@ -81,16 +81,16 @@ export default function BagSummary({
                     : 'text-stone-400 hover:bg-stone-50'
                 }`}
               >
-                {/* 確定マーク */}
+                {/* 用意できたマーク(できていなくても咎めない見た目) */}
                 <div
                   className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition-all ${
                     confirmed
                       ? 'bg-emerald-500'
                       : active
-                      ? 'bg-red-400/20 border-2 border-dashed border-red-300/50'
-                      : 'bg-red-50 border-2 border-dashed border-red-200'
+                      ? 'bg-white/10 border-2 border-dashed border-white/30'
+                      : 'bg-stone-100 border-2 border-dashed border-stone-200'
                   }`}
-                  aria-label={confirmed ? '確定済み' : '未確定'}
+                  aria-label={confirmed ? '用意ずみ' : '準備中'}
                 >
                   {confirmed && <Check size={22} strokeWidth={3} className="text-white" />}
                 </div>
@@ -103,21 +103,13 @@ export default function BagSummary({
                         style={{ background: active ? 'rgba(255,255,255,0.6)' : '#A8A29E' }}
                       />
                       <div className="font-bold text-[21px]">{c.name}</div>
-                      {confirmed ? (
+                      {confirmed && (
                         <span
                           className={`text-[15px] font-bold ${
                             active ? 'text-emerald-400' : 'text-emerald-600'
                           }`}
                         >
-                          確定済み
-                        </span>
-                      ) : (
-                        <span
-                          className={`text-[15px] font-bold ${
-                            active ? 'text-red-300' : 'text-red-400'
-                          }`}
-                        >
-                          未確定・入力中
+                          用意ずみ
                         </span>
                       )}
                     </div>
@@ -230,7 +222,7 @@ export default function BagSummary({
           })}
         </div>
 
-        {/* 全員ぶん共通: 家族へ「中身を確定して」とお願いを送るボタン */}
+        {/* 全員ぶん共通: 家族に「今日のこと聞かせて」と声をかけるボタン */}
         {familyId && (
           <button
             onClick={handleRequestConfirm}
@@ -238,7 +230,7 @@ export default function BagSummary({
             className="w-full mt-3 py-3.5 rounded-xl font-bold text-[16px] flex items-center justify-center gap-2 bg-white border-2 border-amber-300 text-amber-700 active:scale-[0.98] transition-all disabled:opacity-50"
           >
             <Send size={17} strokeWidth={2.5} />
-            {requesting ? '送信しました' : '家族に中身の確定をお願いする'}
+            {requesting ? '送りました' : '家族に「今日のこと聞かせて」'}
           </button>
         )}
       </div>
