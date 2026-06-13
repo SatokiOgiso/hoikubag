@@ -84,13 +84,9 @@ export default function SimpleView({ state, items, date, onChangeDate, onExit }:
             <div key={c.id} className="bg-white rounded-3xl border border-stone-200 shadow-sm p-5">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="text-[24px] font-black text-stone-800">{c.name}</div>
-                {confirmed ? (
+                {confirmed && (
                   <span className="flex items-center gap-1 text-[14px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-1">
-                    <Check size={14} strokeWidth={3} /> 確定済み
-                  </span>
-                ) : (
-                  <span className="text-[14px] font-bold text-red-400 bg-red-50 rounded-full px-2.5 py-1">
-                    入力中
+                    <Check size={14} strokeWidth={3} /> 用意ずみ
                   </span>
                 )}
               </div>

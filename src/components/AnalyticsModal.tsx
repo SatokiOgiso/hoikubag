@@ -244,7 +244,7 @@ function IndividualView({
         <div className="text-5xl mb-3">📊</div>
         <div className="font-black text-stone-700 mb-1">まだ記録がありません</div>
         <div className="text-sm text-stone-500 leading-relaxed">
-          準備リストを「確定」すると、ここに{stat.childName}の実績がたまっていきます。
+          「用意できた!」にした日が、ここに{stat.childName}の記録としてたまっていきます。
         </div>
       </div>
     );

@@ -143,8 +143,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const flat = (await redis(['HGETALL', SUBS_KEY])) as string[] | null;
         const payload = JSON.stringify({
-          title: '⏰ かばんの中身の確定をお願いします',
-          body: '家族から確定のお願いが届きました。明日の持ち物を入力して確定しましょう。',
+          title: '💬 今日のこと、聞かせて',
+          body: '家族が今日のことを知りたがっています。保育園のこと、ひとこと残してみませんか?',
           url: '/',
           tag: 'hoikubag-confirm-request',
         });

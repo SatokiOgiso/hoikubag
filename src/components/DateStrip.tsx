@@ -95,7 +95,7 @@ export default function DateStrip({ selectedDate, forecast, threshold, closedWee
   return (
     <div className="px-5 pt-2 pb-3">
       <div className="flex items-center justify-between mb-2 px-1">
-        <div className="text-[15px] tracking-[0.3em] text-stone-400 font-bold">日付を選ぶ</div>
+        <div className="text-[15px] text-stone-500 font-black">📅 いつの準備?</div>
         <div className="flex items-center gap-2">
           {/* 市町村(あまり変わらないので控えめに)+ 天気の更新ボタン */}
           {locationName && (
