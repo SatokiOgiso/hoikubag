@@ -133,8 +133,8 @@ export default function ItemList({
     <>
     <div className="px-5">
       <div className="flex items-center justify-between mb-3 px-1">
-        <h2 className="text-sm font-bold text-stone-700">
-          持ち物 <span className="text-stone-400">· {child.name}</span>
+        <h2 className="text-[15px] font-black text-stone-700">
+          🧺 {child.name}のしたく
         </h2>
         <div className="flex items-center gap-2">
           {confirmed && (
@@ -164,7 +164,7 @@ export default function ItemList({
           return (
             <div
               key={item.key}
-              className={`rounded-2xl border transition-all ${
+              className={`rounded-3xl border transition-all ${
                 confirmed
                   ? count > 0
                     ? 'bg-stone-50 border-stone-200'
@@ -172,8 +172,8 @@ export default function ItemList({
                   : count > 0
                   ? warn
                     ? 'bg-amber-50 border-amber-300'
-                    : 'bg-white border-stone-300 shadow-sm'
-                  : 'bg-white/50 border-stone-200'
+                    : 'bg-[#FFFCF6] border-amber-200/80 shadow-[0_4px_14px_-10px_rgba(216,107,74,0.45)]'
+                  : 'bg-white/40 border-stone-200/70'
               }`}
             >
               <div className="flex items-center px-3 py-2.5 gap-3">

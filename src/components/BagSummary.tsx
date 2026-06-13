@@ -49,12 +49,12 @@ export default function BagSummary({
 
   return (
     <div className="px-5 mb-4">
-      <div className="rounded-2xl bg-white border border-stone-200 p-4 shadow-sm">
+      <div className="rounded-[28px] bg-gradient-to-br from-[#FFFDF8] to-[#FFF4E8] border border-amber-200/70 p-4 shadow-[0_6px_24px_-12px_rgba(216,107,74,0.4)]">
         <div className="flex items-baseline justify-between mb-3">
-          <div className="text-[15px] text-stone-500 tracking-[0.3em] font-bold">
-            🎒 かばんの中身
+          <div className="text-[17px] text-stone-700 font-black flex items-center gap-1.5">
+            🎒 きょうのかばん
           </div>
-          <div className="text-[18px] text-stone-500 font-bold">{dateLabel(date)}</div>
+          <div className="text-[16px] text-stone-500 font-bold">{dateLabel(date)}</div>
         </div>
 
         <div className="flex flex-col gap-1.5">

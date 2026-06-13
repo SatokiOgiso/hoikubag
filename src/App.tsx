@@ -16,6 +16,31 @@ import SimpleView from './components/SimpleView';
 import ConfirmDialog from './components/ConfirmDialog';
 import { incompleteTaskCount, incompleteCountsByKind, urgentTaskCount } from './lib/tasks';
 import { syncSubscriptionFamily } from './lib/push';
+import { jstMinutesOfDay, jstDateOffset } from './lib/date';
+
+/** 時刻に応じた挨拶(絵文字つき)。開いた瞬間に「迎えられる」感じを出す */
+function greeting(): { hello: string; emoji: string } {
+  const h = Math.floor(jstMinutesOfDay() / 60);
+  if (h >= 5 && h < 11) return { hello: 'おはようございます', emoji: '🌅' };
+  if (h >= 11 && h < 17) return { hello: 'こんにちは', emoji: '🌤️' };
+  if (h >= 17 && h < 23) return { hello: 'こんばんは', emoji: '🌙' };
+  return { hello: 'おつかれさま', emoji: '🌛' };
+}
+
+// プレッシャーをやわらげる、ゆるい応援メッセージ(その日で固定)
+const ENCOURAGEMENTS = [
+  'むりせず、ぼちぼちで大丈夫。',
+  'ぜんぶ完璧じゃなくていい。足りなければ明日たせばOK。',
+  '今日もおつかれさま。できる範囲で。',
+  'まちがえても大丈夫。なんとかなります。',
+  '気づいたことだけ、ひとことメモしておこう。',
+];
+function encouragementOfDay(): string {
+  const d = jstDateOffset(0);
+  let sum = 0;
+  for (let i = 0; i < d.length; i++) sum += d.charCodeAt(i);
+  return ENCOURAGEMENTS[sum % ENCOURAGEMENTS.length];
+}
 
 const ONBOARDED_KEY = 'hoiku-onboarded-v1';
 // 新機能「分析」のお知らせを一度だけ出すためのフラグ
@@ -185,14 +210,13 @@ export default function App() {
   const urgentCount = urgentTaskCount(tasks);
 
   // 両表示モードで共通の要素
-  const backgroundDots = (
-    <div
-      className="fixed inset-0 pointer-events-none opacity-[0.035]"
-      style={{
-        backgroundImage: 'radial-gradient(circle, #3D2818 1px, transparent 1px)',
-        backgroundSize: '24px 24px',
-      }}
-    />
+  // 背景: 方眼ドット(事務的)をやめ、ふんわりした光のにじみで温かい雰囲気に
+  const ambientBackground = (
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+      <div className="absolute -top-28 -left-24 w-80 h-80 rounded-full bg-orange-200/45 blur-3xl" />
+      <div className="absolute top-32 -right-28 w-80 h-80 rounded-full bg-sky-200/40 blur-3xl" />
+      <div className="absolute bottom-[-4rem] left-1/4 w-96 h-96 rounded-full bg-emerald-200/35 blur-3xl" />
+    </div>
   );
   const joinDialog = pendingJoin && (
     <ConfirmDialog
@@ -224,7 +248,7 @@ export default function App() {
   if (simpleView) {
     return (
       <div className="min-h-screen pb-10">
-        {backgroundDots}
+        {ambientBackground}
         <SimpleView
           state={state}
           items={allItems}
@@ -241,7 +265,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-16">
-      {backgroundDots}
+      {ambientBackground}
 
       <div className="relative max-w-lg mx-auto">
         {/* デプロイ識別用バージョン(最上部に小さく) */}
@@ -337,6 +361,18 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        {/* 挨拶バンド: 開いた瞬間に「迎えられる」温かさ + ゆるい応援 */}
+        <div className="px-5 pb-1">
+          <div className="rounded-[28px] border border-white/70 bg-white/55 backdrop-blur-sm px-5 py-4 shadow-[0_4px_20px_-8px_rgba(216,107,74,0.35)]">
+            <div className="text-[22px] font-black text-stone-700 leading-tight">
+              {greeting().hello} <span className="align-middle">{greeting().emoji}</span>
+            </div>
+            <div className="text-[13px] text-stone-500 mt-1 leading-relaxed">
+              {encouragementOfDay()}
+            </div>
+          </div>
+        </div>
 
         {/* 日付ストリップ(最上部・横スクロール) */}
         <DateStrip
